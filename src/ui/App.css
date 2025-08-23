@@ -1,0 +1,11 @@
+html,
+body,
+#map,
+#root {
+	height: 100%;
+	width: 100%;
+}
+
+.maplibregl-control-container {
+	display: none;
+}
