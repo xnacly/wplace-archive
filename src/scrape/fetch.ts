@@ -4,7 +4,7 @@ import { join } from "path";
 import { tilesDir, readdirRecursive, getAllTiles, emptyTile, sleep } from "./util.ts";
 import sharp from "sharp";
 // import { HttpProxyAgent } from "http-proxy-agent";
-import { Agent, ProxyAgent, fetch, setGlobalDispatcher } from "undici";
+import { Agent, ProxyAgent, fetch } from "undici";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -13,32 +13,32 @@ mkdirSync(tilesDir, { recursive: true });
 let calls = 0;
 const concurrency = 68;
 
-const agents = Array.from({ length: concurrency }, (value, index) => {
-	const client = new Agent({
-		keepAliveMaxTimeout: 1000 * 60 * 10,
-		keepAliveTimeout: 1000 * 60 * 10,
-		keepAliveTimeoutThreshold: 0,
-		pipelining: 100,
-	});
+const client = new Agent({
+	keepAliveMaxTimeout: 1000 * 60 * 10,
+	keepAliveTimeout: 1000 * 60 * 10,
+	keepAliveTimeoutThreshold: 0,
+	pipelining: 100,
+});
 
+const agents = Array.from({ length: concurrency }, (value, index) => {
 	return {
 		agent: new ProxyAgent({
 			uri: `http://127.0.0.1:${8100 + index + 1}`,
 			// uri: `http://127.0.0.1:8100`,
-			pipelining: 100,
-			keepAliveTimeout: 1000 * 60 * 10,
-			keepAliveTimeoutThreshold: 0,
-			keepAliveMaxTimeout: 1000 * 60 * 10,
-			allowH2: true,
-			clientFactory(origin, opts) {
-				// return client;
-				return new Agent({
-					keepAliveMaxTimeout: 1000 * 60 * 10,
-					keepAliveTimeout: 1000 * 60 * 10,
-					keepAliveTimeoutThreshold: 0,
-					pipelining: 100,
-				});
-			},
+			pipelining: 10,
+			// keepAliveTimeout: 1000 * 60 * 10,
+			// keepAliveTimeoutThreshold: 0,
+			// keepAliveMaxTimeout: 1000 * 60 * 10,
+			// allowH2: true,
+			// clientFactory(origin, opts) {
+			// 	return client;
+			// 	return new Agent({
+			// 		keepAliveMaxTimeout: 1000 * 60 * 10,
+			// 		keepAliveTimeout: 1000 * 60 * 10,
+			// 		keepAliveTimeoutThreshold: 0,
+			// 		pipelining: 100,
+			// 	});
+			// },
 		}),
 		requests: 0,
 		timeSinceStart: Date.now(),
@@ -56,8 +56,6 @@ async function fetchTile(x: number, y: number, tries = 0) {
 	const { agent, requests, timeSinceStart } = agents[agentIndex];
 	const diff = Date.now() - timeSinceStart;
 	try {
-
-
 		if (requests >= 60 && diff < 60 * 1000) {
 			const wait = 60 * 1000 - diff;
 			console.log(`Agent ${agentIndex} reached 60 requests in ${diff} ms, waiting ${wait} ms...`);
@@ -93,7 +91,9 @@ async function fetchTile(x: number, y: number, tries = 0) {
 
 		const retryAfterMs = parseInt(retryAfter, 10) * 1000;
 
-		console.warn(`Rate limit exceeded, retrying after ${retryAfterMs} ms for tile ${x}, ${y}, after ${requests} calls with agent ${agentIndex} ${diff} ms since start`);
+		console.warn(
+			`Rate limit exceeded, retrying after ${retryAfterMs} ms for tile ${x}, ${y}, after ${requests} calls with agent ${agentIndex} ${diff} ms since start`
+		);
 
 		calls = 0;
 
@@ -127,7 +127,9 @@ let lastCall = Date.now();
 console.log("starting at Y", maxExistingY);
 
 const queue = new PQueue({
-	concurrency,
+	// concurrency,
+	interval: 1000 * 60,
+	intervalCap: concurrency,
 });
 
 let tilesCount = 0;
@@ -152,15 +154,8 @@ for (let y = maxExistingY; y < maxY; y++) {
 			} catch (error) {
 				console.error(`Error fetching tile ${x}, ${y}:`, error);
 			}
-			const diff = Date.now() - lastCall;
-			const wait = Math.max(0, 1000 / concurrency - diff);
-			lastCall = Date.now();
-			if (wait > 0) {
-				// console.log(`Waiting ${wait} ms to avoid rate limiting...`);
-				// await sleep(wait);
-			}
 		});
 
-		await queue.onSizeLessThan(concurrency + 1);
+		await queue.onSizeLessThan(concurrency * 2);
 	}
 }
