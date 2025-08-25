@@ -51,6 +51,6 @@ for (const tile of tiles) {
 
 console.log("Compositing tiles...");
 
-await img.composite(options).toFile(__dirname+"/../../combined.png");
+await img.composite(options as any).toFile(__dirname+"/../../combined.png");
 
 console.log("Combined image saved as combined.png");

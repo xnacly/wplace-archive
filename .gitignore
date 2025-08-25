@@ -39,3 +39,5 @@ mosaic.vrt
 vips-properties.xml
 
 .venv/
+
+tiles.tar.gz

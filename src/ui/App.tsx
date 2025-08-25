@@ -1367,7 +1367,7 @@ function App() {
 						paint: {
 							"line-color": "hsl(0,0%,70%)",
 							"line-dasharray": [1, 1],
-							"line-width": ["interpolate", ["linear", 1], ["zoom"], 7, 1, 11, 2],
+							"line-width": ["interpolate", ["linear", 1], ["zoom"], 7, 1, 11, 2] as any,
 						},
 					},
 					{
