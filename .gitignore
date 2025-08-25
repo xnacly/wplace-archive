@@ -32,9 +32,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
-tiles/
-public/tiles/
+tiles*/
+public/tiles*/
 raw/
 mosaic.vrt
 vips-properties.xml
 
+.venv/

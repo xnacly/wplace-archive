@@ -1,81 +1,205 @@
-import os, re, glob
+import os
+import math
+import shutil
+from pathlib import Path
+from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ---- concurrency defaults (overridable via env) ----
+CPU_CORES = int(os.cpu_count() * 1.5)
+os.environ.setdefault("TILE_JOBS", str(CPU_CORES))
+os.environ.setdefault("VIPS_CONCURRENCY", str(min(4, CPU_CORES)))
+# Use the env var for worker count so CLI/env can override
+WORKERS = int(os.environ["TILE_JOBS"])
+
+# Import pyvips after setting VIPS_CONCURRENCY so it takes effect
 import pyvips
 
-# ---- Konfiguration ----
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
-TILES_DIR = os.path.join(BASE_DIR, "..", "tiles")  # Struktur: tiles/YYYY/XXXX.png (4-stellig gepadded)
-TILE_SIZE = 1000
-OUT_DIR   = os.path.join(BASE_DIR, "google_tiles")
+TILES_DIR = os.path.join(BASE_DIR, "..", "tiles")   # tiles/YYYY/XXXX.png (4-digit padded)
 
-# VIPS zügeln: Cache + Threads
-# pyvips.voperation.cache_set_max(0)                # kein wachsender Op-Cache
-# pyvips.voperation.cache_set_max_mem(200*1024*1024)  # ~200MB
-# pyvips.voperation.cache_set_max_files(4096)
-# pyvips.concurrency_set(max(1, os.cpu_count() // 2))
+IN_ROOT = Path(TILES_DIR)
+OUT_ROOT = Path(os.path.join(BASE_DIR, "..", "public", "tiles3"))
 
-# ---- vorhandene Tiles einsammeln ----
-# files = glob.glob(os.path.join(TILES_DIR, "[0-9][0-9][0-9][0-9]", "[0-9][0-9][0-9][0-9].png"))
-# files = glob.glob(os.path.join(TILES_DIR, "0001", "[0-9][0-9][0-9][0-9].png"))
-files = glob.glob(os.path.join(TILES_DIR, "0000", "000[0-9].png"))
-coords = []
-rx = re.compile(r"([0-9]{4})/([0-9]{4})\.png$")
-for p in files:
-    m = rx.search(p.replace("\\", "/"))
-    if not m: 
-        continue
-    y = int(m.group(1))
-    x = int(m.group(2))
-    coords.append((x, y, p))
+TILE_SIZE = 1000          # your tile pixel size
 
-if not coords:
-    raise SystemExit("Keine Tiles gefunden.")
+# If you don't actually need every level, set e.g. MIN_Z = 6 to stop at z=6
+MIN_Z = 0
 
-# Bounding Box (nur der belegte Bereich)
-min_x = min(x for x,_,_ in coords)
-max_x = max(x for x,_,_ in coords)
-min_y = min(y for _,y,_ in coords)
-max_y = max(y for _,y,_ in coords)
+# WORKERS is set above from TILE_JOBS
 
-width  = (max_x - min_x + 1) * TILE_SIZE
-height = (max_y - min_y + 1) * TILE_SIZE
+# -------- helpers --------
 
-print(f"Erstelle Weltkarte {width}x{height} Pixel, {len(coords)} Tiles")
+def discover_base_dim_yx(in_root: Path) -> int:
+    ys = [int(p.name) for p in in_root.iterdir() if p.is_dir() and p.name.isdigit()]
+    if not ys:
+        raise RuntimeError(f"No y-directories found in {in_root}")
+    dim = max(ys) + 1
+    z = round(math.log2(dim))
+    if 2**z != dim:
+        raise RuntimeError(f"Base grid size must be a power-of-two, found {dim}")
+    return dim  # e.g., 2048
 
-# Leere, transparente Leinwand (RGBA)
-canvas = pyvips.Image.black(width, height, bands=4)
+def ensure_dir(p: Path, cache: set):
+    # avoid millions of redundant mkdir calls
+    if p not in cache:
+        p.mkdir(parents=True, exist_ok=True)
+        cache.add(p)
 
-print("Tiles werden eingefügt...")
+def make_blank_png(path: Path, width: int, height: int, bands: int = 4):
+    # Transparent RGBA by default
+    img = pyvips.Image.black(width, height, bands=bands)
+    img.write_to_file(str(path))
 
-# Tiles einfügen (streamend, ohne Expand)
-for x, y, path in coords:
-    left = (x - min_x) * TILE_SIZE
-    top  = (y - min_y) * TILE_SIZE
+def link_or_copy(src: Path, dst: Path, prefer="hardlink"):
+    # Try hardlink (best for de-dup), then symlink, then copy.
+    # Be concurrency-safe: if another worker created dst meanwhile, just return.
+    if dst.exists():
+        return "exists"
+    try:
+        if prefer == "hardlink":
+            os.link(src, dst)
+            return "hardlink"
+        raise OSError
+    except OSError:
+        try:
+            os.symlink(src, dst)
+            return "symlink"
+        except OSError:
+            try:
+                shutil.copyfile(src, dst)
+                return "copy"
+            except FileExistsError:
+                return "exists"
 
-    tile = pyvips.Image.new_from_file(path, access='sequential')
+def samefile(a: Path, b: Path) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except FileNotFoundError:
+        return False
 
-    # Auf RGBA normalisieren (Alpha=255, falls nicht vorhanden)
-    if not tile.hasalpha():
-        tile = tile.addalpha()
+def read_rgba(path: Path) -> pyvips.Image:
+    img = pyvips.Image.new_from_file(str(path), access="sequential")
+    # Normalize to RGBA so joins never fail
+    if not img.hasalpha():
+        img = img.addalpha()
+    if img.bands < 4:
+        # Paranoia: pad bands up to 4
+        alpha = pyvips.Image.black(img.width, img.height, bands=1) + 255
+        img = img.bandjoin(alpha)
+    return img
 
-    # Falls die PNGs nicht exakt TILE_SIZE sind (z.B. Randkacheln), sicherheitshalber einbetten
-    if tile.width != TILE_SIZE or tile.height != TILE_SIZE:
-        tile = tile.embed(0, 0, TILE_SIZE, TILE_SIZE)
+# -------- pipeline --------
 
-    canvas = canvas.insert(tile, left, top, expand=False)
+def stage_base_level(in_root: Path, out_root: Path, z_base: int, blank_png: Path):
+    """Re-emit base level into z/x/y.png and fill any missing with the shared blank."""
+    dim = 2 ** z_base
+    made_dirs = set()
+    out_z_root = out_root / str(z_base)
+    for x in range(dim):
+        ensure_dir(out_z_root / str(x), made_dirs)
 
-    if x == 0:
-        print(f"  {y:04d} {x:04d} {path}")
+    def do_one(yx):
+        y, x = yx
+        src = in_root / str(x) / f"{y}.png"
+        dst = out_z_root / str(x) / f"{y}.png"
+        if dst.exists():
+            return
+        if src.exists():
+            # Prefer symlink/hardlink to avoid huge copies of your base
+            try:
+                os.symlink(src, dst)
+            except OSError:
+                try:
+                    os.link(src, dst)
+                except OSError:
+                    try:
+                        shutil.copyfile(src, dst)
+                    except FileExistsError:
+                        pass
+        else:
+            link_or_copy(blank_png, dst, prefer="hardlink")
 
-print("Canvas speichern...")
+    tasks = [(y, x) for y in range(dim) for x in range(dim)]
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for _ in tqdm(as_completed([ex.submit(do_one, t) for t in tasks]), total=len(tasks), desc=f"Staging z={z_base}"):
+            pass
 
-# DeepZoom/Google Tiles schreiben (leere Kacheln auslassen)
-# skip_blanks: 0 = nur exakt Hintergrund; default in 'google' ist 5
-canvas.dzsave(
-    OUT_DIR,
-    layout="google",
-    tile_size=TILE_SIZE,
-    overlap=0,
-    suffix=".png",
-    background=[0, 0, 0, 0],
-    skip_blanks=0
-)
+def build_parent_levels(out_root: Path, z_base: int, blank_png: Path, min_z: int = 0):
+    """For each level, join 2x2 children and downsample by 2. Link blank if all 4 are blank."""
+    def process_tile(child_root: Path, parent_root: Path, X: int, Y: int):
+        dst = parent_root / str(X) / f"{Y}.png"
+        if dst.exists():
+            return
+
+        ch_paths = [
+            child_root / str(2*X)   / f"{2*Y}.png",
+            child_root / str(2*X+1) / f"{2*Y}.png",
+            child_root / str(2*X)   / f"{2*Y+1}.png",
+            child_root / str(2*X+1) / f"{2*Y+1}.png",
+        ]
+
+        ch_use = [p if p.exists() else blank_png for p in ch_paths]
+
+        # If all four are the shared blank, just link the blank.
+        if all(samefile(p, blank_png) for p in ch_use):
+            link_or_copy(blank_png, dst, prefer="hardlink")
+            return
+
+        imgs = [read_rgba(p) for p in ch_use]
+        big = pyvips.Image.arrayjoin(imgs, across=2)
+
+        # Pixel art: keep colours crisp and prevent darkening at edges.
+        # 1) Premultiply alpha so resampling doesn't blend with black.
+        # 2) Resize by 0.5 using nearest-neighbour (no smoothing).
+        # 3) Unpremultiply back to straight alpha.
+        # parent = big.premultiply().resize(0.5, kernel="nearest").unpremultiply()
+
+        # parent = big.shrink(2, 2, kernel="nearest")
+        parent = big.shrink(2, 2)
+
+        # Ensure sRGB interpretation for consistent brightness in viewers
+        # parent = parent.copy(interpretation=pyvips.Interpretation.SRGB)
+
+        parent.write_to_file(str(dst))
+        # parent.pngsave(str(dst), palette=True, bitdepth=8, Q=100, dither=0, effort=10)
+
+    for level in range(z_base - 1, min_z - 1, -1):
+        dim_parent = 2 ** level
+        z_child = level + 1
+        z_parent = level
+
+        parent_root = out_root / str(z_parent)
+        child_root  = out_root / str(z_child)
+
+        made_dirs = set()
+        for x in range(dim_parent):
+            ensure_dir(parent_root / str(x), made_dirs)
+
+        tasks = [(X, Y) for Y in range(dim_parent) for X in range(dim_parent)]
+        with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+            futures = [ex.submit(process_tile, child_root, parent_root, X, Y) for (X, Y) in tasks]
+            for _ in tqdm(as_completed(futures), total=len(tasks), desc=f"Build z={level}"):
+                pass
+
+def main():
+    OUT_ROOT.mkdir(parents=True, exist_ok=True)
+
+    dim = discover_base_dim_yx(IN_ROOT)   # e.g., 2048
+    z_base = int(round(math.log2(dim)))   # e.g., 11
+
+    # One shared transparent PNG, hard-linked wherever possible
+    blank_png = OUT_ROOT / "blank.png"
+    if not blank_png.exists():
+        make_blank_png(blank_png, TILE_SIZE, TILE_SIZE, bands=4)
+
+    # 1) Re-emit base to standard naming and fill any gaps with the blank (multithreaded)
+    # stage_base_level(IN_ROOT, OUT_ROOT, z_base, blank_png)
+
+    # 2) Build all parents down to MIN_Z
+    build_parent_levels(OUT_ROOT, z_base, blank_png, MIN_Z)
+
+# Tune overall parallelism with TILE_JOBS (Python threads) and VIPS_CONCURRENCY (libvips internal threads).
+
+if __name__ == "__main__":
+    main()

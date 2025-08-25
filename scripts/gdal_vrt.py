@@ -4,7 +4,7 @@ import os, xml.etree.ElementTree as ET
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 TILES_DIR = os.path.join(BASE_DIR, "..", "tiles")   # tiles/YYYY/XXXX.png (4-digit padded)
 TILE      = 1000
-N_X, N_Y  = 2048, 1
+N_X, N_Y  = 2048, 2048
 W, H      = N_X * TILE, N_Y * TILE
 
 vrt = ET.Element("VRTDataset", rasterXSize=str(W), rasterYSize=str(H))
@@ -20,11 +20,11 @@ for i, name in enumerate(names, 1):
     bands.append(b)
 
 for y in range(N_Y):
-    rowdir = os.path.join(TILES_DIR, f"{y:04d}")
+    rowdir = os.path.join(TILES_DIR, f"{y}")
     if not os.path.isdir(rowdir):
         continue
     for x in range(N_X):
-        fn = os.path.join(rowdir, f"{x:04d}.png")
+        fn = os.path.join(rowdir, f"{x}.png")
         if not os.path.exists(fn):
             continue
         rel = os.path.relpath(fn, start=os.path.dirname(os.path.abspath("mosaic.vrt")))
