@@ -1,5 +1,7 @@
 # WPlace - World Archive
 
+## Map: [wplace.samuelscheit.com](https://wplace.samuelscheit.com/)
+
 A project to scrape, archive and visualize the entire https://wplace.live map.
 
 The map is divided into 2048x2048 tiles, each with a dimension of 1000x1000 pixels.
