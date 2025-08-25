@@ -9,4 +9,7 @@ export default defineConfig({
       ignored: ["**/tiles*/**"],
     },
   },
+  preview: {
+    allowedHosts: true
+  }
 })
