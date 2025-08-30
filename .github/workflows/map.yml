@@ -17,6 +17,7 @@ jobs:
       - name: Install libvips dependency
         run: |
           sudo apt-get update
+          # Install libvips runtime and headers (libvips42 provides libvips.so.42 on Ubuntu; fallback meta pkgs included)
           sudo apt-get install -y libvips libvips-dev || sudo apt-get install -y libvips42 libvips-dev
           vips --version
       - uses: actions/setup-node@v4
@@ -26,7 +27,7 @@ jobs:
       - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
       - run: pip3 install -r requirements.txt
       - run: python3 scripts/vips.py
-  - run: tar -czf tiles.tar.gz -C public tiles
+      - run: tar -czf tiles.tar.gz -C public/tiles
       - uses: actions/upload-artifact@v4
         with:
           name: tiles
