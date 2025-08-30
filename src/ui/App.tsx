@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./App.css";
 
 // const TILE_URL = 'http://localhost:8000/{z}/{x}/{y}.png'; // gdal2tiles output
-const TILE_URL = "/tiles3/{z}/{x}/{y}.png"; // gdal2tiles output
+const TILE_URL = "/tiles/tiles3/{z}/{x}/{y}.png"; // gdal2tiles output
 const TILE_SIZE = 512; // must match --tilesize used in gdal2tiles
 const MIN_ZOOM = 6;
 const MAX_ZOOM = 11; // or your chosen max
