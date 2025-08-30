@@ -19,7 +19,7 @@ BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 TILES_DIR = os.path.join(BASE_DIR, "..", "tiles")   # tiles/YYYY/XXXX.png (4-digit padded)
 
 IN_ROOT = Path(TILES_DIR)
-OUT_ROOT = Path(os.path.join(BASE_DIR, "..", "public", "tiles3"))
+OUT_ROOT = Path(os.path.join(BASE_DIR, "..", "public", "tiles"))
 
 TILE_SIZE = 1000          # your tile pixel size
 

@@ -1,0 +1,29 @@
+name: Generate world map
+
+on:
+  push:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+    inputs:
+      release_id:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
+      - run: python3 scripts/vips.py
+      - run: tar -czf tiles.tar.gz -C public/tiles
+      - uses: actions/upload-artifact@v3
+        with:
+          name: tiles
+          path: tiles.tar.gz
+
+

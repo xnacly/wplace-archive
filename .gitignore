@@ -40,4 +40,4 @@ vips-properties.xml
 
 .venv/
 
-tiles.tar.gz
+**/*.tar.gz
