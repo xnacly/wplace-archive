@@ -16,7 +16,7 @@ WORKERS = int(os.environ["TILE_JOBS"])
 import pyvips
 
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
-TILES_DIR = os.path.join(BASE_DIR, "..", "tiles")   # tiles/YYYY/XXXX.png (4-digit padded)
+TILES_DIR = os.path.join(BASE_DIR, "..", "public", "tiles")   # tiles/YYYY/XXXX.png (4-digit padded)
 
 IN_ROOT = Path(TILES_DIR)
 OUT_ROOT = Path(os.path.join(BASE_DIR, "..", "public", "tiles"))
