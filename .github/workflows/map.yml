@@ -21,7 +21,7 @@ jobs:
       - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
       - run: python3 scripts/vips.py
       - run: tar -czf tiles.tar.gz -C public/tiles
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: tiles
           path: tiles.tar.gz
