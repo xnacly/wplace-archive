@@ -4,7 +4,7 @@ services:
     ports:
       - "8011:4173"
     volumes:
-      - tiles:/app/dist/tiles2/
+      - tiles:/app/dist/
 
 volumes:
   tiles:
