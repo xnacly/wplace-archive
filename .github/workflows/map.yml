@@ -5,7 +5,7 @@ on:
     branches: [ $default-branch ]
   workflow_dispatch:
     inputs:
-      release_id:
+      release_id: 
         required: true
 
 jobs:
@@ -27,9 +27,15 @@ jobs:
       - run: pip3 install -r requirements.txt
       - run: python3 scripts/vips.py
       - run: tar -czf tiles.tar.gz -C public/tiles
-      - uses: actions/upload-artifact@v4
+      - name: Create / Update GitHub Release and upload asset
+        uses: softprops/action-gh-release@v2
         with:
-          name: tiles
-          path: tiles.tar.gz
-
+          tag_name: ${{ github.event.inputs.release_id }}
+          name: ${{ github.event.inputs.release_id  }}
+          draft: false
+          files: |
+            tiles.tar.gz
+          fail_on_unmatched_files: true
+          make_latest: false
+          allow_updates: true
 
