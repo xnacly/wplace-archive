@@ -17,7 +17,6 @@ jobs:
       - name: Install libvips dependency
         run: |
           sudo apt-get update
-          # Install libvips runtime and headers (libvips42 provides libvips.so.42 on Ubuntu; fallback meta pkgs included)
           sudo apt-get install -y libvips libvips-dev || sudo apt-get install -y libvips42 libvips-dev
           vips --version
       - uses: actions/setup-node@v4
