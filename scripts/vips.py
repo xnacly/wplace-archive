@@ -165,7 +165,7 @@ def build_parent_levels(out_root: Path, z_base: int, blank_png: Path, min_z: int
         # parent.pngsave(str(dst), palette=True, bitdepth=8, Q=100, dither=0, effort=10)
 
     for level in range(z_base - 1, min_z - 1, -1):
-        dim_parent = 2 ** level
+        dim_parent = 1
         z_child = level + 1
         z_parent = level
 
