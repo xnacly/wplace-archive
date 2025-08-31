@@ -5,7 +5,6 @@ on:
     inputs:
       release_id:
         required: true
-        description: "Release / tag name (e.g. v1.2.3)"
 
 permissions:
   contents: write   # needed to create / update releases
@@ -30,6 +29,13 @@ jobs:
       - run: pip3 install -r requirements.txt
       - run: python3 scripts/vips.py
       - run: tar -czf tiles.tar.gz -C public/tiles .
+      - name: Split archive into <2GB parts
+        run: |
+          echo "Original archive size:" && ls -lh tiles.tar.gz
+          # Split into 1.9GB chunks (GitHub release asset limit is 2GB)
+          split -b 1900m -d -a 3 tiles.tar.gz tiles.tar.gz.part.
+          rm tiles.tar.gz
+          echo "Generated parts:" && ls -lh tiles.tar.gz.part.*
       - name: Create / Update GitHub Release and upload asset
         uses: softprops/action-gh-release@v2
         with:
@@ -38,7 +44,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           draft: false
           files: |
-            tiles.tar.gz
+            tiles.tar.gz.part.*
           fail_on_unmatched_files: true
           make_latest: false
         env:
