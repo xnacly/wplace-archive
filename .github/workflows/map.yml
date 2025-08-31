@@ -28,26 +28,12 @@ jobs:
       - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
       - run: pip3 install -r requirements.txt
       - run: python3 scripts/vips.py
-      - run: tar -czf tiles.tar.gz -C public/tiles .
-      - name: Split archive into <2GB parts
-        run: |
-          echo "Original archive size:" && ls -lh tiles.tar.gz
-          # Split into 1.9GB chunks (GitHub release asset limit is 2GB)
-          split -b 1900m -d -a 3 tiles.tar.gz tiles.tar.gz.part.
-          rm tiles.tar.gz
-          echo "Generated parts:" && ls -lh tiles.tar.gz.part.*
-      - name: Create / Update GitHub Release and upload asset
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_id }}
-          name: ${{ github.event.inputs.release_id }}
-          target_commitish: ${{ github.sha }}
-          draft: false
-          files: |
-            tiles.tar.gz.part.*
-          fail_on_unmatched_files: true
-          make_latest: false
+      - name: Deploy
+        uses: s0/git-publish-subdir-action@develop
         env:
-          # If you prefer using a PAT with broader scopes, create a secret (e.g. GH_PAT) and set token: ${{ secrets.GH_PAT }}
+          REPO: self
+          BRANCH: ${{ github.event.inputs.release_id }}
+          FOLDER: public/tiles
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
