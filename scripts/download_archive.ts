@@ -89,24 +89,6 @@ const outDir = __dirname + "/../archive";
 
 mkdirSync(outDir, { recursive: true });
 
-// await tar.extract({
-// 	z: true,
-// 	file: __dirname + "/archive.tar.gz",
-// 	cwd: outDir,
-// 	onwarn(message, data) {
-// 		console.warn(message, data);
-// 	},
-// 	ondone() {
-// 		console.log("Extraction complete");
-// 	},
-// 	onWriteEntry(entry) {
-// 		console.log("Extracting", entry.path);
-// 	},
-// });
-
-// tar.extract(outDir, {
-
-// })
 
 execSync(`tar -xzf ${outArchivePath} -C ${outDir}`, {
 	stdio: "pipe",
