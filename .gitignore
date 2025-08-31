@@ -41,3 +41,4 @@ vips-properties.xml
 .venv/
 
 **/*.tar.gz
+*.txt
