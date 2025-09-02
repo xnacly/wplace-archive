@@ -1,0 +1,33 @@
+name: Generate world map
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        required: true
+
+permissions:
+  contents: write   # needed to create / update releases
+  actions: read
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
+      - run: python3 scripts/vips.py
+      - name: Deploy
+        uses: s0/git-publish-subdir-action@develop
+        env:
+          REPO: self
+          BRANCH: tiles/${{ github.event.inputs.release_id }}
+          FOLDER: public/tiles
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
