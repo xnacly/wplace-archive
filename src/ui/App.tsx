@@ -21,6 +21,7 @@ const timeStrings: string[] = [
 	// "2025-08-30T23:25:16.459Z",
 	// "2025-08-30T20:26:19.217Z",
 	// "2025-08-30T17:25:07.835Z",
+"2025-08-25T21-47-23.259Z",
 	"2025-08-09T20:01:14.231Z",
 	// add further timestamps here
 ];
@@ -128,6 +129,7 @@ function App() {
 				.filter((x: any) => x.name.startsWith("tiles/world-"))
 				.map((x: any) => new Date(fixTimestamp(x.name.replace("tiles/world-", ""))));
 			if (!times.length) return;
+return;
 
 			setTimes([new Date("now"), ...times.sort((a, b) => a.getTime() - b.getTime())]);
 		});
@@ -136,11 +138,19 @@ function App() {
 	const currentTime = times[selectedIndex];
 	const currentSlug = timeSlug(currentTime);
 
-	// Build tiles URL for the selected time
-	const timeTilesUrl =
+ // Build tiles URL for the selected time
+	let timeTilesUrl =
 		selectedIndex === 0
 			? `https://proxy293.flam3rboy.workers.dev/https://backend.wplace.live/files/s0/tiles/{x}/{y}.png`
 			: `https://raw.githubusercontent.com/samuelscheit/wplace-archive/tiles/world-${currentSlug}/{z}/{x}/{y}.png`;
+
+if (currentTime.getTime() === new Date("2025-08-25T21-47-23.259Z").getTime()) {
+timeTilesUrl = "/tiles/world-2025-08-25T21-47-23.259Z/{z}/{x}/{y}.png"
+
+}
+
+	
+
 
 	useLayoutEffect(() => {
 		const map = new Map({
