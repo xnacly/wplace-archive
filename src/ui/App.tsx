@@ -23,8 +23,8 @@ const timeStrings: string[] = [
 	// "2025-08-30T17:25:07.835Z",
 	"2025-09-09T11:58:48.527Z",
 	"2025-08-25T21:47:23.259Z",
-	"2025-08-09T20:01:14.231Z",
 	"2025-08-22T11:34:06.282Z",
+	"2025-08-09T20:01:14.231Z",
 	// add further timestamps here
 ];
 const defaultTimes = timeStrings.map((s) => new Date(s));
