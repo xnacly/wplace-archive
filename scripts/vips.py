@@ -118,7 +118,8 @@ def stage_base_level(in_root: Path, out_root: Path, z_base: int, blank_png: Path
                     except FileExistsError:
                         pass
         else:
-            link_or_copy(blank_png, dst, prefer="hardlink")
+            # link_or_copy(blank_png, dst, prefer="hardlink")
+            pass
 
     tasks = [(y, x) for y in range(dim) for x in range(dim)]
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
@@ -143,7 +144,7 @@ def build_parent_levels(out_root: Path, z_base: int, blank_png: Path, min_z: int
 
         # If all four are the shared blank, just link the blank.
         if all(samefile(p, blank_png) for p in ch_use):
-            link_or_copy(blank_png, dst, prefer="hardlink")
+            # link_or_copy(blank_png, dst, prefer="hardlink")
             return
 
         imgs = [read_rgba(p) for p in ch_use]
