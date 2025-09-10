@@ -12,7 +12,7 @@ const WORLD_N = 85.0511287798066; // top latitude in EPSG:3857
 
 // Times available for the time-travel tile layers. Use valid ISO strings (Map overlay folders use ':' replaced by '-').
 const timeStrings: string[] = [
-	"now",
+	// "now",
 	// "2025-08-31T14:13:41.477Z",
 	// "2025-08-31T11:15:49.042Z",
 	// "2025-08-31T08:17:38.125Z",
@@ -21,7 +21,8 @@ const timeStrings: string[] = [
 	// "2025-08-30T23:25:16.459Z",
 	// "2025-08-30T20:26:19.217Z",
 	// "2025-08-30T17:25:07.835Z",
-"2025-08-25T21:47:23.259Z",
+	"2025-09-09T11:58:48.527Z",
+	"2025-08-25T21:47:23.259Z",
 	"2025-08-09T20:01:14.231Z",
 	// add further timestamps here
 ];
@@ -40,6 +41,7 @@ function toISOString(d: Date) {
 
 function timeSlug(d: Date) {
 	if (!d) return "";
+	if (isNaN(d.getTime())) return "now";
 
 	// Folder naming: replace ':' with '-' to be filesystem friendly, keep milliseconds & Z
 	return toISOString(d).replace(/:/g, "-");
@@ -129,7 +131,7 @@ function App() {
 				.filter((x: any) => x.name.startsWith("tiles/world-"))
 				.map((x: any) => new Date(fixTimestamp(x.name.replace("tiles/world-", ""))));
 			if (!times.length) return;
-return;
+			return;
 
 			setTimes([new Date("now"), ...times.sort((a, b) => a.getTime() - b.getTime())]);
 		});
@@ -138,19 +140,11 @@ return;
 	const currentTime = times[selectedIndex];
 	const currentSlug = timeSlug(currentTime);
 
- // Build tiles URL for the selected time
+	// Build tiles URL for the selected time
 	let timeTilesUrl =
-		selectedIndex === 0
+		currentSlug === "now"
 			? `https://proxy293.flam3rboy.workers.dev/https://backend.wplace.live/files/s0/tiles/{x}/{y}.png`
-			: `https://raw.githubusercontent.com/samuelscheit/wplace-archive/tiles/world-${currentSlug}/{z}/{x}/{y}.png`;
-
-if (currentTime.getTime() === new Date("2025-08-25T21:47:23.259Z").getTime()) {
-timeTilesUrl = "/tiles/world-2025-08-25T21-47-23.259Z/{z}/{x}/{y}.png"
-
-}
-
-	
-
+			: `/tiles/world-${currentSlug}/{z}/{x}/{y}.png`;
 
 	useLayoutEffect(() => {
 		const map = new Map({
