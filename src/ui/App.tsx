@@ -74,7 +74,7 @@ function buildHash(params: Record<string, any>) {
 const branchesPromise = fetch("https://api.github.com/repositories/1043382281/branches").then((x) => x.json());
 
 function App() {
-	const [selectedIndex, setSelectedIndex] = useState(1);
+	const [selectedIndex, setSelectedIndex] = useState(0);
 	const mapRef = useRef<Map | null>(null);
 	const mapReadyRef = useRef(false);
 	const [forceUpdate, setForceUpdate] = useState(0);
