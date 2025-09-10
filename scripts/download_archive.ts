@@ -8,15 +8,15 @@ import { execSync } from "child_process";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-
 export async function downloadArchive(repo: string = "murolem/wplace-archives", releaseTag?: string, outDir = __dirname + "/../archive") {
-	const { data } = await axios(`https://api.github.com/repos/${repo}/releases?per_page=100`);
+	let page = 1;
 
-	const release_tag_name = releaseTag || data[0].tag_name;
-	const release = data.find((r: any) => r.tag_name === release_tag_name);
-	if (!release) {
-		throw new Error(`Release not found: ${release_tag_name}. Available releases: ${data.map((r: any) => r.tag_name).join(", ")}`);
-	}
+	do {
+		const { data } = await axios(`https://api.github.com/repos/${repo}/releases?per_page=100&page=${page++}`);
+
+		var release_tag_name = releaseTag || data[0].tag_name;
+		var release = data.find((r: any) => r.tag_name === release_tag_name);
+	} while (!release);
 
 	const { assets } = release;
 
@@ -110,6 +110,4 @@ const outDir = args[2] || __dirname + "/../archive";
 
 console.log(`Downloading archive from repo: ${repo}, release tag: ${releaseTag || "latest"}, output dir: ${outDir}`);
 
-await downloadArchive(repo, releaseTag, outDir)
-
-
+await downloadArchive(repo, releaseTag, outDir);
