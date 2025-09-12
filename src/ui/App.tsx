@@ -319,7 +319,11 @@ function App() {
 			setIsTakingScreenshot(false);
 		} catch (error) {
 			console.error("Screenshot error", error);
-			setErrorScreenshot((error as Error).message);
+			if (error instanceof Error && error.message.includes("callstack size exceeded")) {
+				setErrorScreenshot("The requested screenshot is too large. Please zoom further in and try again.");
+			} else {
+				setErrorScreenshot((error as Error).message);
+			}
 		}
 	};
 
