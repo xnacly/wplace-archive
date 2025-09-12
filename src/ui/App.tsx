@@ -205,8 +205,6 @@ function App() {
 			zoom: initialViewRef.current.zoom ?? 2,
 		});
 
-		globalThis.map = map;
-
 		mapRef.current = map;
 		map.on("load", () => {
 			mapReadyRef.current = true;
