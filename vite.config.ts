@@ -9,8 +9,14 @@ export default defineConfig({
     watch: {
       ignored: ["**/tiles*/**"],
     },
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      preflightContinue: true,
+    }
   },
   preview: {
     allowedHosts: true
-  }
+  },
+  
 })
