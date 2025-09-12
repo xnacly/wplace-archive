@@ -4,6 +4,9 @@ import { ColorSpecification, LayerSpecification, Map } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./App.css";
 import layers from "./mapstyle.json";
+import "./util";
+import { getImageFromMap } from "./util";
+import canvasSize from "canvas-size";
 
 // const TILE_URL = 'http://localhost:8000/{z}/{x}/{y}.png'; // gdal2tiles output
 const TILE_SIZE = 512; // must match --tilesize used in gdal2tiles
@@ -83,6 +86,11 @@ function App() {
 	const [times, setTimes] = useState<Date[]>(defaultTimes);
 	const [pendingHashTime, setPendingHashTime] = useState<string | null>(null);
 
+	const [isTakingScreenshot, setIsTakingScreenshot] = useState(false);
+	const progressBarRef = useRef<HTMLProgressElement>(null);
+	const progressTextRef = useRef<HTMLDivElement>(null);
+	const [errorScreenshot, setErrorScreenshot] = useState<string | null>(null);
+
 	// On first render, parse hash for initial state (center, zoom, time)
 	const initialViewRef = useRef<{ center?: [number, number]; zoom?: number }>({});
 	if (!initialViewRef.current.center) {
@@ -145,7 +153,7 @@ function App() {
 	let timeTilesUrl =
 		currentSlug === "now"
 			? `https://proxy293.flam3rboy.workers.dev/https://backend.wplace.live/files/s0/tiles/{x}/{y}.png`
-			: `/tiles/world-${currentSlug}/{z}/{x}/{y}.png`;
+			: `https://wplace.samuelscheit.com/tiles/world-${currentSlug}/{z}/{x}/{y}.png`;
 
 	useLayoutEffect(() => {
 		const map = new Map({
@@ -196,6 +204,8 @@ function App() {
 			center: initialViewRef.current.center || [0, WORLD_N / 3],
 			zoom: initialViewRef.current.zoom ?? 2,
 		});
+
+		globalThis.map = map;
 
 		mapRef.current = map;
 		map.on("load", () => {
@@ -270,6 +280,51 @@ function App() {
 		setSelectedIndex(idx);
 	}, []);
 
+	const takeScreenshot = async () => {
+		setIsTakingScreenshot(true);
+		// if (!isTakingScreenshot) return;
+		// if (!mapRef.current || !previewCanvasRef.current) return;
+		if (!mapRef.current) return;
+		// if (previousCanvasRef.current === previewCanvasRef.current) return;
+
+		// previousCanvasRef.current = previewCanvasRef.current;
+		let canvas = undefined as any as OffscreenCanvas;
+
+		try {
+			const generator = getImageFromMap(mapRef.current);
+			for await (const update of generator) {
+				if (update.type === "start") {
+					// canvas is ready
+					canvas = update.canvas as any;
+				} else if (update.type === "progress" && update.loaded !== undefined) {
+					if (progressBarRef.current) {
+						progressBarRef.current.value = update.loaded / update.total;
+					}
+					if (progressTextRef.current) {
+						progressTextRef.current.textContent = `Progress: ${Math.round((update.loaded / update.total) * 100)}%`;
+					}
+				}
+			}
+
+			const blob = await canvas.convertToBlob({
+				type: "image/png",
+			});
+
+			const a = document.createElement("a");
+
+			const url = URL.createObjectURL(blob);
+			a.href = url;
+			a.download = "wplace.png";
+			a.click();
+			URL.revokeObjectURL(url);
+
+			setIsTakingScreenshot(false);
+		} catch (error) {
+			console.error("Screenshot error", error);
+			setErrorScreenshot((error as Error).message);
+		}
+	};
+
 	// Apply pending hash time once times are known
 	useEffect(() => {
 		if (!pendingHashTime || !times.length) return;
@@ -339,6 +394,55 @@ function App() {
 							minute: "2-digit",
 						})}
 			</div>
+			<div className="absolute right-2 top-2 z-10">
+				<button
+					onClick={() => {
+						// setIsTakingScreenshot(true);
+						takeScreenshot();
+					}}
+					disabled={isTakingScreenshot}
+					className="rounded bg-neutral-900/70 px-3 py-1 text-xs font-medium text-neutral-100 shadow-md backdrop-blur hover:bg-neutral-800/70 disabled:opacity-50"
+				>
+					{isTakingScreenshot ? "Taking..." : "Screenshot"}
+				</button>
+			</div>
+			{isTakingScreenshot && (
+				<div className="absolute inset-0 z-20 bg-black/50 flex items-center justify-center">
+					{errorScreenshot ? (
+						<div className="bg-white p-4 rounded shadow-lg text-black max-w-md text-center">
+							{errorScreenshot}
+
+							<button
+								onClick={() => {
+									setErrorScreenshot(null);
+									setIsTakingScreenshot(false);
+								}}
+								className="mt-4 rounded bg-neutral-900/70 px-3 py-1 text-xs font-medium text-neutral-100 shadow-md backdrop-blur hover:bg-neutral-800/70"
+							>
+								Close
+							</button>
+						</div>
+					) : (
+						<div className="bg-white p-4 rounded shadow-lg text-black">
+							<div className="text-sm mb-2">Generating screenshot...</div>
+							<div ref={progressTextRef} className="text-xs mb-2">
+								Progress: 0%
+							</div>
+							<progress ref={progressBarRef} max={1} className="w-full mb-4" />
+							{/* <canvas
+							ref={(r) => {
+								previewCanvasRef.current = r;
+								if (!r) return;
+								console.log("ref changed", r);
+								takeScreenshot();
+							}}
+							style={{ width: "200px", height: "200px" }}
+							className="border"
+						/> */}
+						</div>
+					)}
+				</div>
+			)}
 			{/* Timeline overlay */}
 			<div className="absolute left-0 right-0 bottom-0 z-10 bg-gradient-to-t from-neutral-900/80 to-neutral-900/40">
 				<Timeline dayGroups={dayGroups} selectedIndex={selectedIndex} onSelect={onSelect} />
