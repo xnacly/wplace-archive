@@ -100,8 +100,10 @@ async function* stitchTilesToCanvas(
 		step: 1000,
 	});
 
-	if (targetWidth > maxArea.width || targetHeight > maxArea.height) {
-		throw new Error(`Please zoom further in to reduce the image size. The requested image is ${targetWidth}x${targetHeight} pixels, which exceeds the maximum allowed size of ${maxArea.width}x${maxArea.height} pixels.`);
+	const maxRes = maxArea.width * maxArea.height;
+
+	if (targetWidth * targetHeight > maxRes) {
+		throw new Error(`Please zoom further in to reduce the image size.\nThe requested image is ${targetWidth}x${targetHeight} pixels, which exceeds the maximum possible size of your browser ${maxArea.width}x${maxArea.height} pixels.`);
 	}
 
 	if (!canvas) {

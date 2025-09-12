@@ -319,7 +319,7 @@ function App() {
 			setIsTakingScreenshot(false);
 		} catch (error) {
 			console.error("Screenshot error", error);
-			if (error instanceof Error && error.message.includes("callstack size exceeded")) {
+			if (error instanceof Error && error.message.includes("Maximum call stack size exceeded")) {
 				setErrorScreenshot("The requested screenshot is too large. Please zoom further in and try again.");
 			} else {
 				setErrorScreenshot((error as Error).message);
@@ -411,8 +411,8 @@ function App() {
 			{isTakingScreenshot && (
 				<div className="absolute inset-0 z-20 bg-black/50 flex items-center justify-center">
 					{errorScreenshot ? (
-						<div className="bg-white p-4 rounded shadow-lg text-black max-w-md text-center">
-							{errorScreenshot}
+						<div className="bg-white p-4 rounded shadow-lg text-black max-w-md text-center flex flex-col items-center">
+							<p className="whitespace-pre-wrap">{errorScreenshot}</p>
 
 							<button
 								onClick={() => {
