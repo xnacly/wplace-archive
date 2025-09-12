@@ -103,7 +103,9 @@ async function* stitchTilesToCanvas(
 	const maxRes = maxArea.width * maxArea.height;
 
 	if (targetWidth * targetHeight > maxRes) {
-		throw new Error(`Please zoom further in to reduce the image size.\nThe requested image is ${targetWidth}x${targetHeight} pixels, which exceeds the maximum possible size of your browser ${maxArea.width}x${maxArea.height} pixels.`);
+		throw new Error(
+			`Please zoom further in to reduce the image size.\nThe requested image is ${targetWidth}x${targetHeight} pixels, which exceeds the maximum possible size of your browser ${maxArea.width}x${maxArea.height} pixels.`
+		);
 	}
 
 	if (!canvas) {
@@ -118,22 +120,24 @@ async function* stitchTilesToCanvas(
 	yield { type: "start", total, canvas };
 
 	for (let i = 0; i < tiles.length; i++) {
-		const t = tiles[i];
-		const url = expandTemplate(template, t)[0];
-		const img = new Image();
-		img.crossOrigin = "anonymous";
+		try {
+			const t = tiles[i];
+			const url = expandTemplate(template, t)[0];
+			const img = new Image();
+			img.crossOrigin = "anonymous";
 
-		await new Promise((res, rej) => {
-			img.onload = res;
-			img.onerror = (e) => rej(e);
-			img.src = url;
-		});
+			await new Promise((res, rej) => {
+				img.onload = res;
+				img.onerror = (e) => rej(e);
+				img.src = url;
+			});
 
-		const dx = (t.x - minX) * tileSize;
-		const dy = (t.y - minY) * tileSize;
-		ctx.drawImage(img, dx, dy);
+			const dx = (t.x - minX) * tileSize;
+			const dy = (t.y - minY) * tileSize;
+			ctx.drawImage(img, dx, dy);
 
-		yield { type: "progress", loaded: i + 1, total };
+			yield { type: "progress", loaded: i + 1, total };
+		} catch (error) {}
 	}
 
 	new Promise((r) => setTimeout(r, 5000)).then(() => {
