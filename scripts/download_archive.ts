@@ -33,29 +33,49 @@ export async function downloadArchive(repo: string = "murolem/wplace-archives", 
 	type PartResult = { index: number; name: string; path: string; size: number };
 
 	async function downloadPart(asset: any, index: number): Promise<PartResult> {
-		const partPath = `${partsDir}/part_${index.toString().padStart(4, "0")}_${asset.name}`;
-		const response = await axios<Readable>(asset.browser_download_url, { responseType: "stream" });
-		const stream: Readable = response.data as unknown as Readable;
-		const fileStream = createWriteStream(partPath);
-		let loaded = 0;
-		const sizeMB = (asset.size / 1024 / 1024).toFixed(1);
-		process.stdout.write(`Downloading ${asset.name} (0/${sizeMB} MB)\n`);
-		return new Promise<PartResult>((resolve, reject) => {
-			stream.on("data", (chunk: Buffer) => {
-				loaded += chunk.length;
-				if (loaded === asset.size || loaded % (32 * 1024 * 1024) < chunk.length) {
-					const pct = Math.min(100, Math.round((loaded / asset.size) * 100));
-					process.stdout.write(`\r${asset.name} ${pct}% ${(loaded / 1024 / 1024).toFixed(1)}/${sizeMB} MB   `);
-				}
-			});
-			stream.on("error", reject);
-			fileStream.on("error", reject);
-			fileStream.on("finish", () => {
-				process.stdout.write(`\r${asset.name} 100% ${sizeMB}/${sizeMB} MB\n`);
-				resolve({ index, name: asset.name, path: partPath, size: asset.size });
-			});
-			stream.pipe(fileStream);
-		});
+		   const partPath = `${partsDir}/part_${index.toString().padStart(4, "0")}_${asset.name}`;
+		   const sizeMB = (asset.size / 1024 / 1024).toFixed(1);
+		   process.stdout.write(`Downloading ${asset.name} (0/${sizeMB} MB)\n`);
+		   const maxRetries = 5;
+		   let attempt = 0;
+		   while (attempt < maxRetries) {
+			   try {
+				   const response = await axios<Readable>(asset.browser_download_url, { responseType: "stream" });
+				   const stream: Readable = response.data as unknown as Readable;
+				   const fileStream = createWriteStream(partPath);
+				   let loaded = 0;
+				   return await new Promise<PartResult>((resolve, reject) => {
+					   stream.on("data", (chunk: Buffer) => {
+						   loaded += chunk.length;
+						   if (loaded === asset.size || loaded % (32 * 1024 * 1024) < chunk.length) {
+							   const pct = Math.min(100, Math.round((loaded / asset.size) * 100));
+							   process.stdout.write(`\r${asset.name} ${pct}% ${(loaded / 1024 / 1024).toFixed(1)}/${sizeMB} MB   `);
+						   }
+					   });
+					   stream.on("error", (err) => {
+						   reject(err);
+					   });
+					   fileStream.on("error", (err) => {
+						   reject(err);
+					   });
+					   fileStream.on("finish", () => {
+						   process.stdout.write(`\r${asset.name} 100% ${sizeMB}/${sizeMB} MB\n`);
+						   resolve({ index, name: asset.name, path: partPath, size: asset.size });
+					   });
+					   stream.pipe(fileStream);
+				   });
+			   } catch (err: any) {
+				   attempt++;
+				   if (attempt < maxRetries) {
+					   process.stdout.write(`\nError downloading ${asset.name} (attempt ${attempt}): ${err.code || err.message}. Retrying...\n`);
+					   await new Promise(res => setTimeout(res, 2000 * attempt));
+				   } else {
+					   process.stdout.write(`\nFailed to download ${asset.name} after ${maxRetries} attempts.\n`);
+					   throw err;
+				   }
+			   }
+		   }
+		   throw new Error(`Failed to download ${asset.name} after ${maxRetries} attempts.`);
 	}
 
 	const resultsParts: PartResult[] = await Promise.all(sortedAssets.map((a, i) => downloadPart(a, i)));
