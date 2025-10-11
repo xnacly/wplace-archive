@@ -374,6 +374,7 @@ function App() {
 			document.cookie = `googtrans=/en/${lang}; path=/; `;
 			// @ts-ignore
 			new google.translate.TranslateElement(
+				// @ts-ignore
 				{ pageLanguage: "en", layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL },
 				"google_translate_element"
 			);
