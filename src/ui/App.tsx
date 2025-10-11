@@ -614,8 +614,8 @@ function App() {
 							</div>
 
 							<div>
-								I'm currently paying <span className="codeblock">$20</span> to keep this project online with the help of{" "}
-								<span className="codeblock">0</span> donaters.
+								I'm currently paying <span className="codeblock">$20</span> a month to keep this project online with the help of{" "}
+								<span className="codeblock">1</span> donater.
 							</div>
 
 							<div>
@@ -623,7 +623,7 @@ function App() {
 							</div>
 
 							<div>
-								Also <span className="bold">huge thanks</span> to the <span className="bold">supporters</span> ( ) who make
+								Also <span className="bold">huge thanks</span> to the <span className="bold">supporters</span> (Nicolas Rodriguez) who make
 								preserving wplace possible and thank you to{" "}
 								<a
 									href="https://github.com/murolem/wplace-archives/"
@@ -791,7 +791,7 @@ function App() {
 							</DonateButton>
 							<DonateButton
 								href="https://share.weropay.eu/p/1/c/TEtPuXbCOj"
-								style={{ backgroundColor: "#0e9dec", height: "-webkit-fill-available" }}
+								style={{ backgroundColor: "#0e9dec", height: "32px" }}
 							>
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
