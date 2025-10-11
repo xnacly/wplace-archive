@@ -9,3 +9,24 @@ body,
 .maplibregl-control-container {
 	display: none;
 }
+
+.codeblock {
+	font-family: monospace;
+	background-color: #dbdbdb;
+	color: #222222;
+	padding: 3px;
+	border-radius: 5px;
+	overflow-x: auto;
+}
+
+.bold {
+	font-weight: 600;
+}
+
+.skiptranslate {
+	display: none !important;
+}
+
+body {
+	top: 0 !important;
+}
