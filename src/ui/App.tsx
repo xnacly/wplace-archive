@@ -24,6 +24,7 @@ const timeStrings: string[] = [
 	// "2025-08-30T23:25:16.459Z",
 	// "2025-08-30T20:26:19.217Z",
 	// "2025-08-30T17:25:07.835Z",
+	"2025-10-11T13:55:18.919Z",
 	"2025-10-04T12:28:23.768Z",
 	"2025-09-22T17:49:18.014Z",
 	"2025-09-13T14:53:56.640Z",
@@ -55,6 +56,10 @@ function DonateButton(props: AnchorHTMLAttributes<any> & { method?: string }) {
 			}
 		/>
 	);
+}
+
+function ExternalLink(props: AnchorHTMLAttributes<any>) {
+	return <a {...props} target="_blank" rel="noreferrer" className={"text-cyan-800 font-medium " + props.className} />;
 }
 
 function fixTimestamp(ts: string) {
@@ -603,14 +608,13 @@ function App() {
 
 							<div>
 								Behind the scenes every snapshot takes <span className="bold"> 12 hours </span> to render and needs{" "}
-								<span className="bold">~24 GB</span>. I host this on a <span className="bold">$20/month server</span> with{" "}
-								<span className="bold">200 GB disk space</span> (<span className="bold">84% used</span>, about room for one
-								more snapshot).
+								<span className="bold">~24 GB</span>. I host this on a <span className="bold">$24/month server</span> with{" "}
+								<span className="bold">500 GB disk space</span> (<span className="bold">53% used</span>).
 							</div>
 
 							<div>
 								I'm currently paying <span className="codeblock">$20</span> a month to keep this project online with the
-								help of <span className="codeblock">1</span> donater.
+								help of <span className="codeblock">3</span> donaters.
 							</div>
 
 							<div>
@@ -620,8 +624,8 @@ function App() {
 
 							<div>
 								Also <span className="bold">huge thanks</span> to the <span className="bold">supporters</span> (
-								<span className="bg-gray-500/10 ">Nicolas Rodriguez</span>) who make preserving wplace possible and thank
-								you to{" "}
+								<span className="bg-gray-500/10 ">Nicolas R., Anton B., Paweł A.</span>) who make preserving wplace possible
+								and thank you to{" "}
 								<a
 									href="https://github.com/murolem/wplace-archives/"
 									target="_blank"
@@ -713,7 +717,7 @@ function App() {
 						role="dialog"
 						aria-modal="true"
 						aria-labelledby="donation-modal-title"
-						className="bg-white/95 text-neutral-900 max-w-lg w-[92%] rounded-lg shadow-xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+						className="bg-white/95 text-neutral-900 max-w-lg w-[92%] rounded-lg shadow-xl p-6 space-y-3 max-h-[90vh] overflow-y-auto"
 						onClick={(event) => event.stopPropagation()}
 					>
 						<div className="flex items-start justify-between gap-4">
@@ -789,7 +793,11 @@ function App() {
 								</svg>
 								GitHub
 							</DonateButton>
-							<DonateButton href="https://qr.alipay.com/fkx175153zjoblrjcwh4ode" style={{ backgroundColor: "#0e9dec" }} method="alipay">
+							<DonateButton
+								href="https://qr.alipay.com/fkx175153zjoblrjcwh4ode"
+								style={{ backgroundColor: "#0e9dec" }}
+								method="alipay"
+							>
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" className="size-4">
 									<path
 										fill="currentColor"
@@ -871,6 +879,16 @@ function App() {
 								</svg>
 								Crypto
 							</DonateButton> */}
+						</div>
+
+						<div className="text-sm text-neutral-500 pt-2">
+							You can also write me an email at{" "}
+							<ExternalLink href="mailto:wplace@samuelscheit.com">wplace@samuelscheit.com</ExternalLink> <br />
+							or a message @samuelscheit on{" "}
+							<ExternalLink href="https://discord.com/users/311129357362135041">Discord</ExternalLink>,{" "}
+							<ExternalLink href="https://x.com/SamuelScheit">Twitter</ExternalLink>,{" "}
+							<ExternalLink href="https://t.me/samuelscheit">Telegram</ExternalLink>,{" "}
+							<ExternalLink href="https://www.linkedin.com/in/samuelscheit/">Linkedin</ExternalLink>
 						</div>
 					</div>
 				</div>
