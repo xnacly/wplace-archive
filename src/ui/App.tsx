@@ -349,7 +349,12 @@ function App() {
 			URL.revokeObjectURL(url);
 
 			setIsTakingScreenshot(false);
+
+			// @ts-ignore
+			globalThis?.plausible?.("screenshot");
 		} catch (error) {
+			// @ts-ignore
+			globalThis?.plausible?.("screenshot_error");
 			console.error("Screenshot error", error);
 			if (error instanceof Error && error.message.includes("Maximum call stack size exceeded")) {
 				setErrorScreenshot("The requested screenshot is too large. Please zoom further in and try again.");
@@ -613,8 +618,8 @@ function App() {
 							</div>
 
 							<div>
-								I'm currently paying <span className="codeblock">$20</span> a month to keep this project online with the
-								help of <span className="codeblock">3</span> donaters.
+								I'm currently paying <span className="codeblock">$24</span> a month to keep this project online with the
+								help of <span className="codeblock">5</span> donaters.
 							</div>
 
 							<div>
@@ -624,7 +629,7 @@ function App() {
 
 							<div>
 								Also <span className="bold">huge thanks</span> to the <span className="bold">supporters</span> (
-								<span className="bg-gray-500/10 ">Nicolas R., Anton B., Paweł A.</span>) who make preserving wplace possible
+								<span className="bg-gray-500/10 ">Nicolas R., Anton B., Paweł A., Liliana B., Soli</span>) who make preserving wplace possible
 								and thank you to{" "}
 								<a
 									href="https://github.com/murolem/wplace-archives/"
