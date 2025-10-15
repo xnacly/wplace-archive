@@ -302,7 +302,9 @@ function App() {
 			}
 		});
 
-		// layer.setPaintProperty("raster-opacity", 1);
+		setTimeout(() => {
+			map.triggerRepaint();
+		}, 150);
 	}, [currentSlug, forceUpdate]);
 
 	const onSelect = useCallback((idx: number) => {

@@ -126,7 +126,13 @@ export function Donate({
 						</svg>
 						AliPay
 					</DonateButton>
-					<DonateButton type="button" onClick={openBankTransfer} button style={{ backgroundColor: "#8247e5" }}>
+					<DonateButton
+						method="bank_transfer"
+						type="button"
+						onClick={openBankTransfer}
+						button
+						style={{ backgroundColor: "#8247e5" }}
+					>
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="size-4">
 							<path
 								fill="currentColor"
@@ -135,7 +141,7 @@ export function Donate({
 						</svg>
 						Bank transfer
 					</DonateButton>
-					<DonateButton onClick={openCrypto} button style={{ backgroundColor: "#f7931a" }}>
+					<DonateButton method="crypto" onClick={openCrypto} button style={{ backgroundColor: "#f7931a" }}>
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="size-4">
 							<path
 								fill="currentColor"
