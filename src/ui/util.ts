@@ -147,13 +147,13 @@ async function* stitchTilesToCanvas(
 	return canvas;
 }
 
-export async function* getImageFromMap(map: Map, canvas?: OffscreenCanvas) {
+export async function* getImageFromMap(map: Map, source, canvas?: OffscreenCanvas) {
 	// const z = Math.floor(map.getZoom());
 	const z = 11;
 	const visibleTiles = tilesInView(map, z);
 
 	// @ts-ignore
-	const templates = map.getSource("mytiles")!.tiles as string[];
+	const templates = source!.tiles as string[];
 
 	// Usage
 	const template = templates[0];

@@ -323,7 +323,9 @@ function App() {
 		let canvas = undefined as any as OffscreenCanvas;
 
 		try {
-			const generator = getImageFromMap(mapRef.current);
+			const source = mapRef.current.getSource(`tiles-${currentSlug}`) as any;
+
+			const generator = getImageFromMap(mapRef.current, source);
 			for await (const update of generator) {
 				if (update.type === "start") {
 					// canvas is ready
