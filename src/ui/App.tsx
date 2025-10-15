@@ -11,6 +11,7 @@ import { BankTransfer } from "./BankTransfer";
 import { Donate } from "./Donate";
 import { About } from "./About";
 import { Crypto } from "./Crypto";
+// @ts-ignore
 import { useEvent } from "./use-event.js";
 
 // const TILE_URL = 'http://localhost:8000/{z}/{x}/{y}.png'; // gdal2tiles output
@@ -244,6 +245,7 @@ function App() {
 		});
 
 		mapRef.current = map;
+		// @ts-ignore
 		globalThis.map = map;
 		map.on("load", () => {
 			mapReadyRef.current = true;
