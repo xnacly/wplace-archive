@@ -1,5 +1,5 @@
 import canvasSize from "canvas-size";
-import { Map } from "maplibre-gl";
+import { Map, Source } from "maplibre-gl";
 import PQueue, { Queue } from "p-queue";
 
 export function lon2tile(lon: number, z: number) {
@@ -147,7 +147,7 @@ async function* stitchTilesToCanvas(
 	return canvas;
 }
 
-export async function* getImageFromMap(map: Map, source, canvas?: OffscreenCanvas) {
+export async function* getImageFromMap(map: Map, source: Source, canvas?: OffscreenCanvas) {
 	// const z = Math.floor(map.getZoom());
 	const z = 11;
 	const visibleTiles = tilesInView(map, z);
