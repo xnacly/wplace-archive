@@ -11,6 +11,7 @@ import { BankTransfer } from "./BankTransfer";
 import { Donate } from "./Donate";
 import { About } from "./About";
 import { Crypto } from "./Crypto";
+import { useEvent } from "./use-event.js";
 
 // const TILE_URL = 'http://localhost:8000/{z}/{x}/{y}.png'; // gdal2tiles output
 const TILE_SIZE = 512; // must match --tilesize used in gdal2tiles
@@ -86,6 +87,7 @@ function buildHash(params: Record<string, any>) {
 const branchesPromise = fetch("https://api.github.com/repositories/1043382281/branches").then((x) => x.json());
 
 function App() {
+	const [selectionChanged, setSelectionChanged] = useState(false);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const mapRef = useRef<Map | null>(null);
 	const mapReadyRef = useRef(false);
@@ -135,7 +137,7 @@ function App() {
 	}, []);
 
 	// Central hash sync (uses current map + selected time)
-	const syncHash = useCallback(() => {
+	const syncHash = useEvent(() => {
 		const m = mapRef.current;
 		if (!m) return;
 		const c = m.getCenter();
@@ -144,7 +146,21 @@ function App() {
 		const slug = timeSlug(currentTimeLocal);
 		const newHash = buildHash({ z: z.toFixed(2), lat: c.lat.toFixed(5), lng: c.lng.toFixed(5), time: slug });
 		if (window.location.hash !== newHash) window.history.replaceState(null, "", newHash);
-	}, [times, selectedIndex]);
+		setSelectionChanged(false);
+
+		if (selectionChanged) return;
+
+		// unload all other layers which aren't active
+		console.log("synchash");
+
+		const otherLayers = m.getStyle()?.layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
+		otherLayers.forEach((l) => {
+			const otherLayer = m.getLayer(l.id);
+			if (!otherLayer) return;
+
+			m.setLayoutProperty(l.id, "visibility", "none");
+		});
+	}, [times, selectedIndex, selectionChanged]);
 
 	useLayoutEffect(() => {
 		branchesPromise.then((branches: any) => {
@@ -160,12 +176,6 @@ function App() {
 
 	const currentTime = times[selectedIndex];
 	const currentSlug = timeSlug(currentTime);
-
-	// Build tiles URL for the selected time
-	let timeTilesUrl =
-		currentSlug === "now"
-			? `https://proxy293.flam3rboy.workers.dev/https://backend.wplace.live/files/s0/tiles/{x}/{y}.png`
-			: `https://wplace.samuelscheit.com/tiles/world-${currentSlug}/{z}/{x}/{y}.png`;
 
 	useLayoutEffect(() => {
 		const map = new Map({
@@ -185,12 +195,19 @@ function App() {
 						type: "vector",
 						url: "https://tiles.openfreemap.org/planet",
 					},
-					mytiles: {
-						type: "raster",
-						tiles: [timeTilesUrl],
-						tileSize: TILE_SIZE,
-						scheme: "xyz",
-					},
+					...Object.fromEntries(
+						defaultTimes.map((time) => {
+							return [
+								`tiles-${timeSlug(time)}`,
+								{
+									type: "raster",
+									tiles: [`https://wplace.samuelscheit.com/tiles/world-${timeSlug(time)}/{z}/{x}/{y}.png`],
+									tileSize: TILE_SIZE,
+									scheme: "xyz",
+								},
+							];
+						})
+					),
 				},
 				layers: [
 					{
@@ -201,15 +218,24 @@ function App() {
 						},
 					},
 					...(layers as any),
-					{
-						id: "mytiles",
-						type: "raster",
-						source: "mytiles",
-						paint: {
-							"raster-resampling": "nearest",
-							"raster-opacity": 1,
-						},
-					},
+					...defaultTimes.map((x) => {
+						const visibility = timeSlug(x) === currentSlug ? "visible" : "none";
+
+						return {
+							id: `tiles-${timeSlug(x)}`,
+							type: "raster",
+							source: `tiles-${timeSlug(x)}`,
+							paint: {
+								"raster-resampling": "nearest",
+								"raster-opacity": 1,
+							},
+
+							layout: {
+								visibility, // visible
+								// visibility: "visible", // visible
+							},
+						};
+					}),
 				],
 			},
 			renderWorldCopies: false,
@@ -218,6 +244,7 @@ function App() {
 		});
 
 		mapRef.current = map;
+		globalThis.map = map;
 		map.on("load", () => {
 			mapReadyRef.current = true;
 			setForceUpdate((i) => i + 1);
@@ -249,45 +276,36 @@ function App() {
 
 	// Update raster source when the selected time changes
 	useLayoutEffect(() => {
-		console.log("Updating tiles to", timeTilesUrl, currentSlug);
 		if (!currentSlug) return;
 
 		const map = mapRef.current;
 		if (!map || !mapReadyRef.current) return;
-		const src: any = map.getSource("mytiles");
-		const newTiles = [timeTilesUrl];
-		// If source API supports setTiles
-		if (src && typeof src.setTiles === "function") {
-			src.setTiles(newTiles);
-			map.triggerRepaint();
 
-			if (timeTilesUrl.includes("proxy293.flam3rboy.workers.dev")) {
-				src.minzoom = 11;
-			} else {
-				src.minzoom = 0;
+		const layer = map.getLayer(`tiles-${currentSlug}`);
+		if (!layer) return;
+
+		map.setLayoutProperty(`tiles-${currentSlug}`, "visibility", "visible");
+		map.setPaintProperty(`tiles-${currentSlug}`, "raster-opacity", 1);
+
+		const otherLayers = map.getStyle().layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
+		otherLayers.forEach((l) => {
+			const otherLayer = map.getLayer(l.id);
+			if (!otherLayer) return;
+
+			map.setPaintProperty(l.id, "raster-opacity", 0);
+			if (selectionChanged) {
+				setTimeout(() => {
+					map.setLayoutProperty(l.id, "visibility", "visible");
+				}, 100);
 			}
-		} else {
-			// Fallback: remove and re-add source & layer
-			if (map.getLayer("mytiles")) map.removeLayer("mytiles");
-			if (map.getSource("mytiles")) map.removeSource("mytiles");
-			map.addSource("mytiles", {
-				type: "raster",
-				tiles: newTiles,
-				tileSize: TILE_SIZE,
-				scheme: "xyz",
-				maxzoom: 11,
-			});
-			map.addLayer({
-				id: "mytiles",
-				type: "raster",
-				source: "mytiles",
-				paint: { "raster-resampling": "nearest", "raster-opacity": 1 },
-			});
-		}
-	}, [timeTilesUrl, forceUpdate]);
+		});
+
+		// layer.setPaintProperty("raster-opacity", 1);
+	}, [currentSlug, forceUpdate]);
 
 	const onSelect = useCallback((idx: number) => {
 		setSelectedIndex(idx);
+		setSelectionChanged(true);
 	}, []);
 
 	const takeScreenshot = async () => {
@@ -382,15 +400,10 @@ function App() {
 	}, []);
 	const closeDonate = useCallback(() => setIsDonateOpen(false), []);
 	const openBankTransfer = useCallback(() => {
-		// @ts-ignore
-		globalThis?.plausible?.("bank_transfer");
 		setIsBankTransferOpen(true);
 	}, []);
 	const closeBankTransfer = useCallback(() => setIsBankTransferOpen(false), []);
 	const openCrypto = useCallback(() => {
-		// @ts-ignore
-		globalThis?.plausible?.("crypto");
-
 		setIsCryptoOpen(true);
 	}, []);
 	const closeCrypto = useCallback(() => setIsCryptoOpen(false), []);
