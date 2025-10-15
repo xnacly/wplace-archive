@@ -85,11 +85,8 @@ function buildHash(params: Record<string, any>) {
 	return "#" + parts.join("&");
 }
 
-const branchesPromise = fetch("https://api.github.com/repositories/1043382281/branches").then((x) => x.json());
-
 function App() {
-	const [selectionChanged, setSelectionChanged] = useState(false);
-	const [selectedIndex, setSelectedIndex] = useState(0);
+	const [selectionChanged, setSelectionChanged] = useState(true);
 	const mapRef = useRef<Map | null>(null);
 	const mapReadyRef = useRef(false);
 	const [forceUpdate, setForceUpdate] = useState(0);
@@ -98,9 +95,6 @@ function App() {
 	const [isCryptoOpen, setIsCryptoOpen] = useState(false);
 	const [isBankTransferOpen, setIsBankTransferOpen] = useState(false);
 
-	const [times, setTimes] = useState<Date[]>(defaultTimes);
-	const [pendingHashTime, setPendingHashTime] = useState<string | null>(null);
-
 	const [isTakingScreenshot, setIsTakingScreenshot] = useState(false);
 	const progressBarRef = useRef<HTMLProgressElement>(null);
 	const progressTextRef = useRef<HTMLDivElement>(null);
@@ -108,74 +102,76 @@ function App() {
 
 	// On first render, parse hash for initial state (center, zoom, time)
 	const initialViewRef = useRef<{ center?: [number, number]; zoom?: number }>({});
+	let pendingIndex = 0;
 	if (!initialViewRef.current.center) {
 		const params = parseHash();
-		applyHashParams(params, initialViewRef.current, setPendingHashTime);
+		const p = applyHashParams(params, initialViewRef.current);
+		pendingIndex = p.index || 0;
 	}
+	const [selectedIndex, setSelectedIndex] = useState(pendingIndex);
 
 	// Helper to apply hash params to view/time state
 	function applyHashParams(
 		params: Record<string, string>,
-		view: { center?: [number, number]; zoom?: number } = {},
-		setTime?: (slug: string) => void
+		view: { center?: [number, number]; zoom?: number; time?: string; index?: number } = {}
 	) {
 		const lat = params.lat ? parseFloat(params.lat) : undefined;
 		const lng = params.lng ? parseFloat(params.lng) : undefined;
 		const z = params.z ? parseFloat(params.z) : undefined;
 		if (isFinite(lat!) && isFinite(lng!)) view.center = [lng!, lat!];
 		if (isFinite(z!)) view.zoom = z!;
-		if (params.time && setTime) setTime(params.time);
+		view.time = params.time;
+
+		let idx = defaultTimes.findIndex((t) => timeSlug(t) === params.time);
+		if (idx === -1 && params.time) {
+			const isoCandidate = recoverIsoFromSlug(params.time);
+			idx = defaultTimes.findIndex((t) => toISOString(t) === isoCandidate);
+		}
+
+		view.index = idx !== -1 ? idx : 0;
+
 		return view;
 	}
 
 	// Wrapper applying params directly to a live map instance
 	const applyParamsToMap = useCallback((params: Record<string, string>) => {
 		const m = mapRef.current;
-		const view = applyHashParams(params, {}, setPendingHashTime);
+		const view = applyHashParams(params, {});
 		if (!m) return;
 		if (view.center) m.setCenter(view.center);
 		if (view.zoom !== undefined) m.setZoom(view.zoom);
 	}, []);
 
 	// Central hash sync (uses current map + selected time)
-	const syncHash = useEvent(() => {
-		const m = mapRef.current;
-		if (!m) return;
-		const c = m.getCenter();
-		const z = m.getZoom();
-		const currentTimeLocal = times[selectedIndex];
-		const slug = timeSlug(currentTimeLocal);
-		const newHash = buildHash({ z: z.toFixed(2), lat: c.lat.toFixed(5), lng: c.lng.toFixed(5), time: slug });
-		if (window.location.hash !== newHash) window.history.replaceState(null, "", newHash);
-		setSelectionChanged(false);
+	const syncHash = useEvent(
+		(index = selectedIndex, selChanged = selectionChanged) => {
+			if (typeof index !== "number") index = selectedIndex;
+			console.log("syncHash", index, selChanged);
+			const m = mapRef.current;
+			if (!m) return;
+			const c = m.getCenter();
+			const z = m.getZoom();
+			const currentTimeLocal = defaultTimes[index];
+			const slug = timeSlug(currentTimeLocal);
+			const newHash = buildHash({ z: z.toFixed(2), lat: c.lat.toFixed(5), lng: c.lng.toFixed(5), time: slug });
+			if (window.location.hash !== newHash) window.history.replaceState(null, "", newHash);
+			setSelectionChanged(false);
 
-		if (selectionChanged) return;
+			if (selChanged) return;
 
-		// unload all other layers which aren't active
-		console.log("synchash");
+			// unload all other layers which aren't active
+			const otherLayers = m.getStyle()?.layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
+			otherLayers.forEach((l) => {
+				const otherLayer = m.getLayer(l.id);
+				if (!otherLayer) return;
 
-		const otherLayers = m.getStyle()?.layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
-		otherLayers.forEach((l) => {
-			const otherLayer = m.getLayer(l.id);
-			if (!otherLayer) return;
+				m.setLayoutProperty(l.id, "visibility", "none");
+			});
+		},
+		[selectedIndex, selectionChanged]
+	);
 
-			m.setLayoutProperty(l.id, "visibility", "none");
-		});
-	}, [times, selectedIndex, selectionChanged]);
-
-	useLayoutEffect(() => {
-		branchesPromise.then((branches: any) => {
-			const times: Date[] = branches
-				.filter((x: any) => x.name.startsWith("tiles/world-"))
-				.map((x: any) => new Date(fixTimestamp(x.name.replace("tiles/world-", ""))));
-			if (!times.length) return;
-			return;
-
-			setTimes([new Date("now"), ...times.sort((a, b) => a.getTime() - b.getTime())]);
-		});
-	}, []);
-
-	const currentTime = times[selectedIndex];
+	const currentTime = defaultTimes[selectedIndex];
 	const currentSlug = timeSlug(currentTime);
 
 	useLayoutEffect(() => {
@@ -309,17 +305,13 @@ function App() {
 
 	const onSelect = useCallback((idx: number) => {
 		setSelectedIndex(idx);
-		setSelectionChanged(true);
+		syncHash(idx, true);
 	}, []);
 
 	const takeScreenshot = async () => {
 		setIsTakingScreenshot(true);
-		// if (!isTakingScreenshot) return;
-		// if (!mapRef.current || !previewCanvasRef.current) return;
 		if (!mapRef.current) return;
-		// if (previousCanvasRef.current === previewCanvasRef.current) return;
 
-		// previousCanvasRef.current = previewCanvasRef.current;
 		let canvas = undefined as any as OffscreenCanvas;
 
 		try {
@@ -451,27 +443,6 @@ function App() {
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [isBankTransferOpen, closeBankTransfer]);
 
-	// Apply pending hash time once times are known
-	useEffect(() => {
-		if (!pendingHashTime || !times.length) return;
-		const slug = pendingHashTime;
-		// Try slug direct match or ISO match
-		let idx = times.findIndex((t) => timeSlug(t) === slug);
-		if (idx === -1) {
-			const isoCandidate = recoverIsoFromSlug(slug);
-			idx = times.findIndex((t) => toISOString(t) === isoCandidate);
-		}
-		if (idx >= 0) {
-			setSelectedIndex(idx);
-			setPendingHashTime(null);
-		}
-	}, [pendingHashTime, times]);
-
-	// When selected time changes, update hash (keeping current map center/zoom)
-	useLayoutEffect(() => {
-		syncHash();
-	}, [selectedIndex, times, syncHash]);
-
 	// Group times by calendar day (YYYY-MM-DD) preserving original order
 	interface DayGroup {
 		key: string;
@@ -480,8 +451,8 @@ function App() {
 	}
 	const dayGroups = useMemo<DayGroup[]>(() => {
 		const dayMap = new globalThis.Map<string, DayGroup>();
-		for (let i = 0; i < times.length; i++) {
-			const d = times[i];
+		for (let i = 0; i < defaultTimes.length; i++) {
+			const d = defaultTimes[i];
 
 			let key = d.toLocaleDateString(navigator.language, {
 				month: "short",
@@ -494,14 +465,15 @@ function App() {
 			dayMap.get(key)!.items.push({ date: d, index: i });
 		}
 		return Array.from(dayMap.values());
-	}, [times]);
+	}, [defaultTimes]);
+
+	const onKey = useEvent(function onKey(e: KeyboardEvent) {
+		if (e.key === "ArrowLeft") onSelect(Math.max(0, selectedIndex - 1));
+		else if (e.key === "ArrowRight") onSelect(Math.min(defaultTimes.length - 1, selectedIndex + 1));
+	});
 
 	// Simple keyboard navigation
 	useLayoutEffect(() => {
-		function onKey(e: KeyboardEvent) {
-			if (e.key === "ArrowLeft") setSelectedIndex((i) => Math.max(0, i - 1));
-			else if (e.key === "ArrowRight") setSelectedIndex((i) => Math.min(times.length - 1, i + 1));
-		}
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 	}, []);
