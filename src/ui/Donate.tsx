@@ -26,7 +26,7 @@ function DonateButton({ button, type, method, ...props }: AnchorHTMLAttributes<a
 	);
 }
 
-function ExternalLink(props: AnchorHTMLAttributes<any>) {
+export function ExternalLink(props: AnchorHTMLAttributes<any>) {
 	return <a {...props} target="_blank" rel="noreferrer" className={"text-cyan-800 font-medium " + props.className} />;
 }
 

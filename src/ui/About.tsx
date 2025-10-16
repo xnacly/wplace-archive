@@ -1,4 +1,5 @@
 import { Map } from "maplibre-gl";
+import { ExternalLink } from "./Donate";
 
 export function About({
 	closeAbout,
@@ -135,6 +136,15 @@ export function About({
 								Samuel Scheit
 							</a>
 						</span>
+						<div className=" text-neutral-500">
+							You can also write me an email at{" "}
+							<ExternalLink href="mailto:wplace@samuelscheit.com">wplace@samuelscheit.com</ExternalLink> <br />
+							or a message @samuelscheit on{" "}
+							<ExternalLink href="https://discord.com/users/311129357362135041">Discord</ExternalLink>,{" "}
+							<ExternalLink href="https://x.com/SamuelScheit">Twitter</ExternalLink>,{" "}
+							<ExternalLink href="https://t.me/samuelscheit">Telegram</ExternalLink>,{" "}
+							<ExternalLink href="https://www.linkedin.com/in/samuelscheit/">Linkedin</ExternalLink>
+						</div>
 						<div className="text-center text-[0.6rem] text-neutral-500">
 							Source code on{" "}
 							<a
