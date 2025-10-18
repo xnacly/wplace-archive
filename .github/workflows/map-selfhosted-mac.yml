@@ -1,45 +1,38 @@
 name: Generate world map (self hosted mac)
 
 on:
-  workflow_dispatch:
-    inputs:
-      release_id:
-        required: true
+    workflow_dispatch:
+        inputs:
+            release_id:
+                required: true
 
 permissions:
-  contents: write   # needed to create / update releases
-  actions: read
+    contents: write # needed to create / update releases
+    actions: read
 
 jobs:
-  build:
-    runs-on: [self-hosted, macOS, ARM64]
+    build:
+        runs-on: [self-hosted, macOS, ARM64]
 
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm install
-      - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
-      - run: python3 scripts/vips.py
-      - run: tar -czf tiles.tar.gz  --no-xattrs -C public/tiles .
-      - name: Split archive into <2GB parts
-        run: |
-          echo "Original archive size:" && ls -lh tiles.tar.gz
-          # Split into 1.9GB chunks (GitHub release asset limit is 2GB)
-          split -b 1900m -d -a 3 tiles.tar.gz tiles.tar.gz.part.
-          rm tiles.tar.gz
-          echo "Generated parts:" && ls -lh tiles.tar.gz.part.*
-      - name: Create / Update GitHub Release and upload asset
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_id }}
-          name: ${{ github.event.inputs.release_id }}
-          target_commitish: ${{ github.sha }}
-          draft: false
-          files: |
-            tiles.tar.gz.part.*
-          fail_on_unmatched_files: true
-          make_latest: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: npm install
+            - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
+            - run: python3 scripts/vips.py
+            - run: tar -czf tiles.tar.gz  --no-xattrs -C public/tiles .
+            - name: Split archive into <2GB parts
+              run: |
+                  echo "Original archive size:" && ls -lh tiles.tar.gz
+                  # Split into 1.9GB chunks (GitHub release asset limit is 2GB)
+                  split -b 1900m -d -a 3 tiles.tar.gz tiles.tar.gz.part.
+                  rm tiles.tar.gz
+                  echo "Generated parts:" && ls -lh tiles.tar.gz.part.*
+            - name: Upload release assets
+              run: |
+                  echo ${{ GITHUB_TOKEN }} | gh auth login --with-token
+                  gh release upload ${{ github.event.inputs.release_id }} tiles.tar.gz.part.* --repo https://github.com/samuelscheit/wplace-archive/
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
