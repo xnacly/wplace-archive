@@ -32,7 +32,7 @@ jobs:
                   echo "Generated parts:" && ls -lh tiles.tar.gz.part.*
             - name: Upload release assets
               run: |
-                  echo ${{ GITHUB_TOKEN }} | gh auth login --with-token
+                  echo "$GITHUB_TOKEN" | gh auth login --with-token
                   gh release upload ${{ github.event.inputs.release_id }} tiles.tar.gz.part.* --repo https://github.com/samuelscheit/wplace-archive/
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

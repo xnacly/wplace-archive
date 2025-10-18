@@ -24,7 +24,7 @@ jobs:
             - run: pip3 install -r requirements.txt
             - run: python3 scripts/vips.py
             - run: tar -czf tiles.tar.gz  --no-xattrs -C public/tiles .
-            - run: mv public/tiles /var/lib/docker/volumes/cc0ccwsg4csggwwwg48ookc0_tiles/_data/${github.event.inputs.release_id}
+            - run: mv public/tiles /var/lib/docker/volumes/cc0ccwsg4csggwwwg48ookc0_tiles/_data/${{ github.event.inputs.release_id }}
             - name: Split archive into <2GB parts
               run: |
                   echo "Original archive size:" && ls -lh tiles.tar.gz
@@ -34,7 +34,7 @@ jobs:
                   echo "Generated parts:" && ls -lh tiles.tar.gz.part.*
             - name: Upload release assets
               run: |
-                  echo ${{ GITHUB_TOKEN }} | gh auth login --with-token
+                  echo "$GITHUB_TOKEN" | gh auth login --with-token
                   gh release upload ${{ github.event.inputs.release_id }} tiles.tar.gz.part.* --repo https://github.com/samuelscheit/wplace-archive/
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
