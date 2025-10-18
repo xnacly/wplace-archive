@@ -21,7 +21,6 @@ jobs:
                   node-version: 24
             - run: npm install
             - run: node scripts/download_archive.ts ${{ github.event.inputs.release_id }}
-            - run: pip3 install -r requirements.txt
             - run: python3 scripts/vips.py
             - run: tar -czf tiles.tar.gz  --no-xattrs -C public/tiles .
             - run: mv public/tiles /var/lib/docker/volumes/cc0ccwsg4csggwwwg48ookc0_tiles/_data/${{ github.event.inputs.release_id }}
