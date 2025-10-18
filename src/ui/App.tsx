@@ -30,6 +30,7 @@ const timeStrings: string[] = [
 	// "2025-08-30T23:25:16.459Z",
 	// "2025-08-30T20:26:19.217Z",
 	// "2025-08-30T17:25:07.835Z",
+	"2025-10-18T07:23:59.887Z",
 	"2025-10-11T13:55:18.919Z",
 	"2025-10-04T12:28:23.768Z",
 	"2025-09-22T17:49:18.014Z",
@@ -201,6 +202,7 @@ function App() {
 									tiles: [`https://wplace.samuelscheit.com/tiles/world-${timeSlug(time)}/{z}/{x}/{y}.png`],
 									tileSize: TILE_SIZE,
 									scheme: "xyz",
+									maxzoom: 11,
 								},
 							];
 						})
@@ -226,7 +228,6 @@ function App() {
 								"raster-resampling": "nearest",
 								"raster-opacity": 1,
 							},
-
 							layout: {
 								visibility, // visible
 								// visibility: "visible", // visible

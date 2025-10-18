@@ -64,7 +64,7 @@ export function About({
 
 					<div>
 						I'm currently paying <span className="codeblock">$24</span> a month to keep this project online with the help of{" "}
-						<span className="codeblock">5</span> donaters.
+						<span className="codeblock">+ 2</span> donaters.
 					</div>
 
 					<div>
@@ -74,8 +74,10 @@ export function About({
 
 					<div>
 						Also <span className="bold">huge thanks</span> to the <span className="bold">supporters</span> (
-						<span className="bg-gray-500/10 ">Nicolas R., Anton B., Paweł A., Liliana B., Soli</span>) who make preserving
-						wplace possible and thank you to{" "}
+						<span className="bg-gray-500/10 ">
+							Nicolas R., Anton B., Paweł A., Liliana B., Soli, Kilen N., Claira W., Dhu S., Alex N.
+						</span>
+						) who make preserving wplace possible and thank you to{" "}
 						<a
 							href="https://github.com/murolem/wplace-archives/"
 							target="_blank"
