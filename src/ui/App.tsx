@@ -57,8 +57,8 @@ function getInitialTheme(): Theme {
 	} catch (error) {
 		// ignore storage access issues (e.g., privacy modes)
 	}
-	const prefersLight = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: light)").matches;
-	return prefersLight ? "light" : "dark";
+	// const prefersLight = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: light)").matches;
+	return "light";
 }
 
 async function fetchTileBitmap(url: string, signal: AbortSignal, context: string) {
