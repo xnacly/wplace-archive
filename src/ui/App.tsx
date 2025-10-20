@@ -354,12 +354,12 @@ function App() {
 							"background-color": isDarkTheme ? "#000000" : "#f8f4f0",
 						},
 					},
-					...(layers as any).map((l) => {
+					...(layers as any).map((l: any) => {
 						if (!l.layout) l.layout = {};
 						l.layout.visibility = isDarkTheme ? "none" : "visible";
 						return l;
 					}),
-					...(layersDark as any).map((l) => {
+					...(layersDark as any).map((l: any) => {
 						if (!l.layout) l.layout = {};
 						l.layout.visibility = isDarkTheme ? "visible" : "none";
 						return l;
