@@ -99,7 +99,7 @@ export default function Timeline({ dayGroups, selectedIndex, onSelect }: Timelin
 				onKeyDown={onKey}
 			>
 				{/* Day segments */}
-				<div className="absolute inset-x-0 top-1 h-4 flex gap-px">
+				<div className="absolute inset-x-0 top-1 h-4 flex">
 					{dayGroups.map((g, di) => (
 						<div key={g.key} className="relative flex-1 bg-neutral-700/30">
 							{g.items.map((it, wi) => {

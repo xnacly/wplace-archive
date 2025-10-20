@@ -1,12 +1,12 @@
 import { useLayoutEffect, useState, useRef, useCallback, useMemo, useEffect, AnchorHTMLAttributes } from "react";
 import Timeline from "./Timeline";
-import { ColorSpecification, LayerSpecification, Map } from "maplibre-gl";
+import { addProtocol, ColorSpecification, LayerSpecification, Map } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./App.css";
 import layers from "./mapstyle.json";
+import layersDark from "./mapstyle_dark.json";
 import "./util";
 import { getImageFromMap } from "./util";
-import canvasSize from "canvas-size";
 import { BankTransfer } from "./BankTransfer";
 import { Donate } from "./Donate";
 import { About } from "./About";
@@ -15,7 +15,9 @@ import { Crypto } from "./Crypto";
 import { useEvent } from "./use-event.js";
 
 // const TILE_URL = 'http://localhost:8000/{z}/{x}/{y}.png'; // gdal2tiles output
-const TILE_SIZE = 512; // must match --tilesize used in gdal2tiles
+const TILE_SIZE = 1000; // must match --tilesize used in gdal2tiles
+const TILE_BASE_URL = "https://wplace.samuelscheit.com/tiles";
+const MAX_SOURCE_ZOOM = 11; // deepest zoom level available on the tile server
 
 const WORLD_N = 85.0511287798066; // top latitude in EPSG:3857
 
@@ -43,6 +45,85 @@ const timeStrings: string[] = [
 ];
 const defaultTimes = timeStrings.map((s) => new Date(s));
 
+type Theme = "light" | "dark";
+
+function getInitialTheme(): Theme {
+	if (typeof window === "undefined") return "dark";
+	try {
+		const stored = window.localStorage.getItem("theme");
+		if (stored === "light" || stored === "dark") {
+			return stored;
+		}
+	} catch (error) {
+		// ignore storage access issues (e.g., privacy modes)
+	}
+	const prefersLight = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: light)").matches;
+	return prefersLight ? "light" : "dark";
+}
+
+async function fetchTileBitmap(url: string, signal: AbortSignal, context: string) {
+	const res = await fetch(url, { signal });
+	if (!res.ok) {
+		throw new Error(`Failed to fetch tile ${context}: ${res.status} ${res.statusText}`);
+	}
+
+	const blob = await res.blob();
+	try {
+		return await createImageBitmap(blob);
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		throw new Error(`Failed to create ImageBitmap for ${context}: ${message}`);
+	}
+}
+
+async function combineTileDepth(options: { id: string; requestedZoom: number; x: number; y: number; depth: number; signal: AbortSignal }) {
+	const { id, requestedZoom, x, y, depth, signal } = options;
+	if (depth <= 0) {
+		const directUrl = `${TILE_BASE_URL}/${id}/${requestedZoom}/${x}/${y}.png`;
+		const res = await fetch(directUrl, { signal });
+		if (!res.ok) {
+			throw new Error(`Failed to fetch tile ${requestedZoom}/${x}/${y}: ${res.status} ${res.statusText}`);
+		}
+		return { data: await res.arrayBuffer() };
+	}
+
+	const fetchZoom = Math.min(requestedZoom + depth, MAX_SOURCE_ZOOM);
+	const effectiveDepth = fetchZoom - requestedZoom;
+	const tilesPerAxis = 1 << effectiveDepth;
+	const baseX = x * tilesPerAxis;
+	const baseY = y * tilesPerAxis;
+	const drawSize = TILE_SIZE / tilesPerAxis;
+
+	const offscreen = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
+	const ctx = offscreen.getContext("2d");
+	if (!ctx) throw new Error("Failed to get 2D context");
+
+	const bitmapPromises: Promise<{ bitmap: ImageBitmap; offsetX: number; offsetY: number }>[] = [];
+	for (let offsetX = 0; offsetX < tilesPerAxis; offsetX++) {
+		for (let offsetY = 0; offsetY < tilesPerAxis; offsetY++) {
+			const tileX = baseX + offsetX;
+			const tileY = baseY + offsetY;
+			const url = `${TILE_BASE_URL}/${id}/${fetchZoom}/${tileX}/${tileY}.png`;
+			bitmapPromises.push(
+				fetchTileBitmap(url, signal, `${fetchZoom}/${tileX}/${tileY}`).then((bitmap) => ({
+					bitmap,
+					offsetX,
+					offsetY,
+				}))
+			);
+		}
+	}
+
+	const tiles = await Promise.all(bitmapPromises);
+	for (const { bitmap, offsetX, offsetY } of tiles) {
+		ctx.drawImage(bitmap, offsetX * drawSize, offsetY * drawSize, drawSize, drawSize);
+		bitmap.close?.();
+	}
+
+	const data = await offscreen.convertToBlob({ type: "image/png" });
+	return { data: await data.arrayBuffer() };
+}
+
 function fixTimestamp(ts: string) {
 	// only fix the time section
 	return ts.replace(/T(\d+)-(\d+)-(\d+\.\d+Z)/, "T$1:$2:$3");
@@ -69,13 +150,20 @@ function recoverIsoFromSlug(slug: string) {
 
 function parseHash(): Record<string, string> {
 	if (typeof window === "undefined") return {};
-	const h = window.location.hash.replace(/^#/, "");
+	const h = (window.location.hash || window.location.search).replace(/^#/, "").replace(/^\?/, "");
 	if (!h) return {};
 	const out: Record<string, string> = {};
 	h.split("&").forEach((pair) => {
 		const [k, v] = pair.split("=").map(decodeURIComponent);
 		if (k) out[k] = v ?? "";
 	});
+
+	if (out.zoom) {
+		out.z = out.zoom;
+	} else if (out.z) {
+		out.zoom = out.z;
+	}
+
 	return out;
 }
 
@@ -83,10 +171,12 @@ function buildHash(params: Record<string, any>) {
 	const parts = Object.entries(params)
 		.filter(([, v]) => v !== undefined && v !== null && v !== "")
 		.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
-	return "#" + parts.join("&");
+	return location.pathname + "#" + parts.join("&");
 }
 
 function App() {
+	const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
+	const isDarkTheme = theme === "dark";
 	const [selectionChanged, setSelectionChanged] = useState(true);
 	const mapRef = useRef<Map | null>(null);
 	const mapReadyRef = useRef(false);
@@ -100,6 +190,55 @@ function App() {
 	const progressBarRef = useRef<HTMLProgressElement>(null);
 	const progressTextRef = useRef<HTMLDivElement>(null);
 	const [errorScreenshot, setErrorScreenshot] = useState<string | null>(null);
+
+	useLayoutEffect(() => {
+		if (typeof document === "undefined") return;
+		document.documentElement.setAttribute("data-theme", theme);
+		document.documentElement.style.colorScheme = theme;
+	}, [theme]);
+
+	useMemo(() => {
+		const map = mapRef.current;
+		if (!map) return;
+
+		map.setPaintProperty("background", "background-color", isDarkTheme ? "#000000" : "#f8f4f0");
+
+		layers.forEach((layer) => {
+			map.setLayoutProperty(layer.id, "visibility", isDarkTheme ? "none" : "visible");
+		});
+
+		layersDark.forEach((layer) => {
+			map.setLayoutProperty(layer.id, "visibility", isDarkTheme ? "visible" : "none");
+		});
+
+		map.triggerRepaint();
+	}, [isDarkTheme, mapRef.current]);
+
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+		try {
+			window.localStorage.setItem("theme", theme);
+		} catch (error) {
+			// ignore storage access errors
+		}
+	}, [theme]);
+
+	const toggleTheme = useCallback(() => {
+		setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+	}, []);
+
+	const openLive = useCallback(() => {
+		const map = mapRef.current;
+		if (!map) return;
+
+		const c = map.getCenter();
+		const z = map.getZoom();
+		const link = `https://wplace.live/?lat=${c.lat.toFixed(5)}&lng=${c.lng.toFixed(5)}&zoom=${Math.max(z, 10.61).toFixed(2)}`;
+
+		window.open(link, "_blank");
+	}, []);
+
+	const themeButtonLabel = isDarkTheme ? "Switch to light mode" : "Switch to dark mode";
 
 	// On first render, parse hash for initial state (center, zoom, time)
 	const initialViewRef = useRef<{ center?: [number, number]; zoom?: number }>({});
@@ -147,7 +286,6 @@ function App() {
 	const syncHash = useEvent(
 		(index = selectedIndex, selChanged = selectionChanged) => {
 			if (typeof index !== "number") index = selectedIndex;
-			console.log("syncHash", index, selChanged);
 			const m = mapRef.current;
 			if (!m) return;
 			const c = m.getCenter();
@@ -199,8 +337,8 @@ function App() {
 								`tiles-${timeSlug(time)}`,
 								{
 									type: "raster",
-									tiles: [`https://wplace.samuelscheit.com/tiles/world-${timeSlug(time)}/{z}/{x}/{y}.png`],
-									tileSize: TILE_SIZE,
+									tiles: [`custom://wplace.samuelscheit.com/tiles/world-${timeSlug(time)}/{z}/{x}/{y}.png`],
+									// tileSize: TILE_SIZE,
 									scheme: "xyz",
 									maxzoom: 11,
 								},
@@ -213,10 +351,19 @@ function App() {
 						id: "background",
 						type: "background",
 						paint: {
-							"background-color": "#f8f4f0",
+							"background-color": isDarkTheme ? "#000000" : "#f8f4f0",
 						},
 					},
-					...(layers as any),
+					...(layers as any).map((l) => {
+						if (!l.layout) l.layout = {};
+						l.layout.visibility = isDarkTheme ? "none" : "visible";
+						return l;
+					}),
+					...(layersDark as any).map((l) => {
+						if (!l.layout) l.layout = {};
+						l.layout.visibility = isDarkTheme ? "visible" : "none";
+						return l;
+					}),
 					...defaultTimes.map((x) => {
 						const visibility = timeSlug(x) === currentSlug ? "visible" : "none";
 
@@ -239,6 +386,40 @@ function App() {
 			renderWorldCopies: false,
 			center: initialViewRef.current.center || [0, WORLD_N / 3],
 			zoom: initialViewRef.current.zoom ?? 2,
+		});
+
+		addProtocol("custom", async (params, abortController) => {
+			const uri = new URL(params.url);
+			const [_, __, id, zoom, x, yFile] = uri.pathname.split("/");
+			const y = yFile.replace(".png", "");
+
+			const zoomNumber = Number(zoom);
+			const xNumber = Number(x);
+			const yNumber = Number(y);
+
+			let depth = Math.max(0, Math.floor(MAX_SOURCE_ZOOM - zoomNumber));
+
+			// if (depth > 0) {
+			// 	depth = Math.min(depth, 3);
+			// 	console.log(`Combining ${1 << (depth * 2)} tiles into 1 for zoom ${zoomNumber} to ${depth + zoomNumber}`);
+			// }
+
+			if (zoomNumber === 11) {
+				depth = 0;
+			} else if (zoomNumber === 10) {
+				depth = 1;
+			} else {
+				depth = 0;
+			}
+
+			return combineTileDepth({
+				id,
+				requestedZoom: zoomNumber,
+				x: xNumber,
+				y: yNumber,
+				depth: 0,
+				signal: abortController.signal,
+			});
 		});
 
 		mapRef.current = map;
@@ -468,17 +649,6 @@ function App() {
 		return Array.from(dayMap.values());
 	}, [defaultTimes]);
 
-	const onKey = useEvent(function onKey(e: KeyboardEvent) {
-		if (e.key === "ArrowLeft") onSelect(Math.max(0, selectedIndex - 1));
-		else if (e.key === "ArrowRight") onSelect(Math.min(defaultTimes.length - 1, selectedIndex + 1));
-	});
-
-	// Simple keyboard navigation
-	useLayoutEffect(() => {
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, []);
-
 	return (
 		<>
 			<div id="map" />
@@ -511,7 +681,7 @@ function App() {
 							})}
 				</div>
 			</div>
-			<div className="absolute right-2 top-2 z-10">
+			<div className="absolute right-2 top-2 z-10 flex flex-col gap-2 items-end">
 				<button
 					onClick={() => {
 						// setIsTakingScreenshot(true);
@@ -521,6 +691,23 @@ function App() {
 					className="rounded bg-neutral-900/70 px-3 py-1 text-xs font-medium text-neutral-100 shadow-md backdrop-blur hover:bg-neutral-800/70 disabled:opacity-50"
 				>
 					{isTakingScreenshot ? "Taking..." : "Screenshot"}
+				</button>
+				<button
+					type="button"
+					onClick={toggleTheme}
+					className="rounded bg-neutral-900/70 px-3 py-1 text-xs font-medium text-neutral-100 shadow-md backdrop-blur hover:bg-neutral-800/70"
+					aria-pressed={isDarkTheme}
+					aria-label={themeButtonLabel}
+					title={themeButtonLabel}
+				>
+					{isDarkTheme ? "Light Mode" : "Dark Mode"}
+				</button>
+				<button
+					type="button"
+					className="rounded bg-neutral-900/70 px-3 py-1 text-xs font-medium text-neutral-100 shadow-md backdrop-blur hover:bg-neutral-800/70"
+					onClick={openLive}
+				>
+					Open Live
 				</button>
 			</div>
 			{isTakingScreenshot && (

@@ -156,7 +156,7 @@ export async function* getImageFromMap(map: Map, source: Source, canvas?: Offscr
 	const templates = source!.tiles as string[];
 
 	// Usage
-	const template = templates[0];
+	const template = templates[0].replace("custom://", "https://");
 	const generator = stitchTilesToCanvas(visibleTiles, template, 1000, canvas);
 
 	for await (const update of generator) {
