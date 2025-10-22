@@ -14,24 +14,10 @@ import { Crypto } from "./Crypto";
 // @ts-ignore
 import { useEvent } from "./use-event.js";
 
-// const TILE_URL = 'http://localhost:8000/{z}/{x}/{y}.png'; // gdal2tiles output
-const TILE_SIZE = 1000; // must match --tilesize used in gdal2tiles
-const TILE_BASE_URL = "https://wplace.samuelscheit.com/tiles";
-const MAX_SOURCE_ZOOM = 11; // deepest zoom level available on the tile server
-
 const WORLD_N = 85.0511287798066; // top latitude in EPSG:3857
 
 // Times available for the time-travel tile layers. Use valid ISO strings (Map overlay folders use ':' replaced by '-').
 const timeStrings: string[] = [
-	// "now",
-	// "2025-08-31T14:13:41.477Z",
-	// "2025-08-31T11:15:49.042Z",
-	// "2025-08-31T08:17:38.125Z",
-	// "2025-08-31T05:20:54.654Z",
-	// "2025-08-31T02:23:54.630Z",
-	// "2025-08-30T23:25:16.459Z",
-	// "2025-08-30T20:26:19.217Z",
-	// "2025-08-30T17:25:07.835Z",
 	"2025-10-18T07:23:59.887Z",
 	"2025-10-11T13:55:18.919Z",
 	"2025-10-04T12:28:23.768Z",
@@ -41,7 +27,6 @@ const timeStrings: string[] = [
 	"2025-08-25T21:47:23.259Z",
 	"2025-08-22T11:34:06.282Z",
 	"2025-08-09T20:01:14.231Z",
-	// add further timestamps here
 ];
 const defaultTimes = timeStrings.map((s) => new Date(s));
 
@@ -59,74 +44,6 @@ function getInitialTheme(): Theme {
 	}
 	// const prefersLight = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: light)").matches;
 	return "light";
-}
-
-async function fetchTileBitmap(url: string, signal: AbortSignal, context: string) {
-	const res = await fetch(url, { signal });
-	if (!res.ok) {
-		throw new Error(`Failed to fetch tile ${context}: ${res.status} ${res.statusText}`);
-	}
-
-	const blob = await res.blob();
-	try {
-		return await createImageBitmap(blob);
-	} catch (err) {
-		const message = err instanceof Error ? err.message : String(err);
-		throw new Error(`Failed to create ImageBitmap for ${context}: ${message}`);
-	}
-}
-
-async function combineTileDepth(options: { id: string; requestedZoom: number; x: number; y: number; depth: number; signal: AbortSignal }) {
-	const { id, requestedZoom, x, y, depth, signal } = options;
-	if (depth <= 0) {
-		const directUrl = `${TILE_BASE_URL}/${id}/${requestedZoom}/${x}/${y}.png`;
-		const res = await fetch(directUrl, { signal });
-		if (!res.ok) {
-			throw new Error(`Failed to fetch tile ${requestedZoom}/${x}/${y}: ${res.status} ${res.statusText}`);
-		}
-		return { data: await res.arrayBuffer() };
-	}
-
-	const fetchZoom = Math.min(requestedZoom + depth, MAX_SOURCE_ZOOM);
-	const effectiveDepth = fetchZoom - requestedZoom;
-	const tilesPerAxis = 1 << effectiveDepth;
-	const baseX = x * tilesPerAxis;
-	const baseY = y * tilesPerAxis;
-	const drawSize = TILE_SIZE / tilesPerAxis;
-
-	const offscreen = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
-	const ctx = offscreen.getContext("2d");
-	if (!ctx) throw new Error("Failed to get 2D context");
-
-	const bitmapPromises: Promise<{ bitmap: ImageBitmap; offsetX: number; offsetY: number }>[] = [];
-	for (let offsetX = 0; offsetX < tilesPerAxis; offsetX++) {
-		for (let offsetY = 0; offsetY < tilesPerAxis; offsetY++) {
-			const tileX = baseX + offsetX;
-			const tileY = baseY + offsetY;
-			const url = `${TILE_BASE_URL}/${id}/${fetchZoom}/${tileX}/${tileY}.png`;
-			bitmapPromises.push(
-				fetchTileBitmap(url, signal, `${fetchZoom}/${tileX}/${tileY}`).then((bitmap) => ({
-					bitmap,
-					offsetX,
-					offsetY,
-				}))
-			);
-		}
-	}
-
-	const tiles = await Promise.all(bitmapPromises);
-	for (const { bitmap, offsetX, offsetY } of tiles) {
-		ctx.drawImage(bitmap, offsetX * drawSize, offsetY * drawSize, drawSize, drawSize);
-		bitmap.close?.();
-	}
-
-	const data = await offscreen.convertToBlob({ type: "image/png" });
-	return { data: await data.arrayBuffer() };
-}
-
-function fixTimestamp(ts: string) {
-	// only fix the time section
-	return ts.replace(/T(\d+)-(\d+)-(\d+\.\d+Z)/, "T$1:$2:$3");
 }
 
 function toISOString(d: Date) {
@@ -337,7 +254,7 @@ function App() {
 								`tiles-${timeSlug(time)}`,
 								{
 									type: "raster",
-									tiles: [`custom://wplace.samuelscheit.com/tiles/world-${timeSlug(time)}/{z}/{x}/{y}.png`],
+									tiles: [`https://wplace.samuelscheit.com/tiles/world-${timeSlug(time)}/{z}/{x}/{y}.png`],
 									// tileSize: TILE_SIZE,
 									scheme: "xyz",
 									maxzoom: 11,
@@ -386,40 +303,6 @@ function App() {
 			renderWorldCopies: false,
 			center: initialViewRef.current.center || [0, WORLD_N / 3],
 			zoom: initialViewRef.current.zoom ?? 2,
-		});
-
-		addProtocol("custom", async (params, abortController) => {
-			const uri = new URL(params.url);
-			const [_, __, id, zoom, x, yFile] = uri.pathname.split("/");
-			const y = yFile.replace(".png", "");
-
-			const zoomNumber = Number(zoom);
-			const xNumber = Number(x);
-			const yNumber = Number(y);
-
-			let depth = Math.max(0, Math.floor(MAX_SOURCE_ZOOM - zoomNumber));
-
-			// if (depth > 0) {
-			// 	depth = Math.min(depth, 3);
-			// 	console.log(`Combining ${1 << (depth * 2)} tiles into 1 for zoom ${zoomNumber} to ${depth + zoomNumber}`);
-			// }
-
-			if (zoomNumber === 11) {
-				depth = 0;
-			} else if (zoomNumber === 10) {
-				depth = 1;
-			} else {
-				depth = 0;
-			}
-
-			return combineTileDepth({
-				id,
-				requestedZoom: zoomNumber,
-				x: xNumber,
-				y: yNumber,
-				depth: 0,
-				signal: abortController.signal,
-			});
 		});
 
 		mapRef.current = map;
