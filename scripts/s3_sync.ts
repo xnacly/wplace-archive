@@ -124,7 +124,9 @@ async function streamConcatenateAssets(assets: any[], keys = new Set<string>(), 
 		const stream = await streamConcatenateAsset(asset);
 
 		for await (const chunk of stream) {
+			// @ts-ignore
 			console.log(`Queue ${queue.size} | Running: ${queue.pending} | Backlog Tar ${parseStream[QUEUE].length}`);
+			// @ts-ignore
 			if (parseStream[QUEUE]?.length > 200) {
 				await new Promise((resolve) => parseStream.once("drain", resolve));
 				console.log("Backpressure: drained parser queue");
@@ -185,7 +187,7 @@ async function downloadRelease(release: any) {
 	const keys = new Set<string>();
 	let continuationToken: string | undefined;
 
-	while (1 == 0) {
+	while (true) {
 		// const page = await s3.list({
 		// 	prefix: `tiles/${release.name}/`,
 		// 	maxKeys: 1000,
