@@ -125,7 +125,7 @@ async function streamConcatenateAssets(assets: any[], keys = new Set<string>(), 
 
 		for await (const chunk of stream) {
 			// @ts-ignore
-			console.log(`Queue ${queue.size} | Running: ${queue.pending} | Backlog Tar ${parseStream[QUEUE].length}`);
+			console.log(`${asset.name} | Queue ${queue.size} | Running: ${queue.pending} | Backlog Tar ${parseStream[QUEUE].length}`);
 			// @ts-ignore
 			if (parseStream[QUEUE]?.length > 200) {
 				await new Promise((resolve) => parseStream.once("drain", resolve));
@@ -212,7 +212,7 @@ async function downloadRelease(release: any) {
 		if (!isTruncated || !next) break;
 		continuationToken = next;
 	}
-	console.log("Existing tiles in S3:", keys);
+	console.log("Existing tiles in S3:", keys.size, "for release", release.name);
 
 	// Fetch the list of assets for this release
 	const assetsResp = await octokit.rest.repos.listReleaseAssets({
@@ -237,7 +237,7 @@ async function downloadRelease(release: any) {
 }
 
 async function main() {
-	let page = 5;
+	let page = 0;
 	let toFetch = [];
 
 	release_loop: while (true) {
@@ -256,7 +256,7 @@ async function main() {
 			const now = new Date();
 			const ageDays = (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60 * 24);
 
-			if (ageDays > 7 || 1 == 1) {
+			if (ageDays > 7) {
 				if (!toFetch.length) {
 					toFetch.push(data.at(-1)!);
 				}
