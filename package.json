@@ -27,11 +27,13 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.916.0",
+		"@aws-sdk/s3-request-presigner": "^3.917.0",
 		"@tailwindcss/vite": "^4.1.12",
 		"axios": "^1.11.0",
 		"canvas-size": "^2.0.0",
 		"framer-motion": "^12.23.12",
 		"freebind": "^0.2.2",
+		"gunzip-maybe": "^1.4.2",
 		"http-proxy-agent": "^7.0.2",
 		"https-proxy-agent": "^7.0.6",
 		"maplibre-gl": "^5.7.1",
@@ -43,6 +45,7 @@
 		"sharp": "^0.34.3",
 		"tar": "^7.5.1",
 		"tar-fs": "^3.1.0",
+		"tar-stream": "^3.1.7",
 		"undici": "^7.15.0"
 	}
 }
