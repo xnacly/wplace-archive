@@ -1,136 +1,165 @@
-import { useMemo, useRef, useCallback } from "react";
-
-interface DayGroup {
-	key: string; // YYYY-MM-DD
-	date: Date;
-	items: { date: Date; index: number }[];
-}
+import { useRef, useCallback, useLayoutEffect, useState, useEffect } from "react";
+import "./Timeline.css";
 
 interface TimelineProps {
-	dayGroups: DayGroup[];
+	dates: Date[];
 	selectedIndex: number;
 	onSelect: (index: number) => void;
 }
 
-// Custom timeline where each day occupies equal horizontal space regardless of
-// number of timestamps. Ticks inside a day are distributed evenly.
-export default function Timeline({ dayGroups, selectedIndex, onSelect }: TimelineProps) {
-	const totalItems = useMemo(() => dayGroups.reduce((s, g) => s + g.items.length, 0), [dayGroups]);
-	const trackRef = useRef<HTMLDivElement | null>(null);
+// Custom timeline using HTML range input, with steps equal to number of dates.
+// Date labels are shown below, skipping those that would overlap to fit as many as possible without scrolling.
+export default function Timeline({ dates, selectedIndex, onSelect }: TimelineProps) {
+	const containerRef = useRef<HTMLInputElement | null>(null);
+	const [labelData, setLabelData] = useState<{ index: number; left?: number; text: string; leftPercent?: number; alignment?: string }[]>(
+		[],
+	);
+	const totalItems = dates.length;
 
-	const dayCount = dayGroups.length;
-
-	// Build a quick lookup for (global index -> {dayIdx, withinIdx, withinCount})
-	const indexMeta = useMemo(() => {
-		const m: Record<number, { dayIdx: number; withinIdx: number; withinCount: number }> = {};
-		dayGroups.forEach((dg, di) => {
-			dg.items.forEach((it, wi) => {
-				m[it.index] = { dayIdx: di, withinIdx: wi, withinCount: dg.items.length };
-			});
+	const formatLabel = useCallback((date: Date) => {
+		if (!date || isNaN(date.getTime())) return "Now";
+		return date.toLocaleDateString(undefined, {
+			month: "short",
+			day: "2-digit",
 		});
-		return m;
-	}, [dayGroups]);
+	}, []);
 
-	const calcIndexFromPointer = useCallback(
-		(clientX: number) => {
-			const el = trackRef.current;
-			if (!el) return selectedIndex;
-			const r = el.getBoundingClientRect();
-			const pct = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-			const dayFloat = pct * dayCount;
-			const dayIdx = Math.min(dayCount - 1, Math.max(0, Math.floor(dayFloat)));
-			const dayStartPct = dayIdx / dayCount;
-			const insideDayPct = (pct - dayStartPct) * dayCount; // 0..1 inside day segment
-			const group = dayGroups[dayIdx];
-			const len = group.items.length;
-			if (len === 1) return group.items[0].index;
-			const withinIdx = Math.round(insideDayPct * (len - 1));
-			return group.items[withinIdx].index;
+	const computeLabels = useCallback(() => {
+		const container = containerRef.current;
+		if (!container || !totalItems) {
+			setLabelData([]);
+			return;
+		}
+
+		const sliderWidth = container.getBoundingClientRect().width;
+
+		if (!sliderWidth) {
+			setLabelData([]);
+			return;
+		}
+
+		const approxLabelWidth = 48; // Tailwind w-12
+		const maxLabelsBySpace = Math.max(1, Math.floor(sliderWidth / approxLabelWidth));
+		const desiredCount = totalItems === 1 ? 1 : Math.max(2, maxLabelsBySpace);
+		const visibleCount = Math.min(totalItems, desiredCount);
+
+		if (visibleCount <= 0) {
+			setLabelData([]);
+			return;
+		}
+
+		if (visibleCount === 1) {
+			const text = formatLabel(dates[0]);
+			setLabelData([
+				{
+					index: 0,
+					leftPercent: 50,
+					text,
+					alignment: "center",
+				},
+			]);
+			return;
+		}
+
+		const lastIndex = totalItems - 1;
+		const denominator = visibleCount - 1;
+		const indices: number[] = [];
+		let previous = -1;
+		for (let slot = 0; slot < visibleCount; slot++) {
+			const fraction = slot / denominator;
+			let candidate = slot === visibleCount - 1 ? lastIndex : Math.round(fraction * lastIndex);
+			candidate = Math.min(lastIndex, Math.max(previous + 1, candidate));
+			indices.push(candidate);
+			previous = candidate;
+		}
+
+		const halfWidth = approxLabelWidth / 2;
+		const minLeft = Math.min(halfWidth, sliderWidth / 2);
+		const maxLeft = Math.max(minLeft, sliderWidth - minLeft);
+
+		const labels = indices.map((dataIndex, position) => {
+			const fraction = position / denominator;
+			let left = fraction * sliderWidth;
+			left = Math.max(minLeft, Math.min(maxLeft, left));
+			return {
+				index: dataIndex,
+				left,
+				text: formatLabel(dates[dataIndex]),
+			};
+		});
+
+		setLabelData(labels);
+	}, [dates, formatLabel, totalItems]);
+
+	useLayoutEffect(() => {
+		computeLabels();
+	}, [computeLabels]);
+
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const resizeObserver = new ResizeObserver(() => {
+			computeLabels();
+		});
+		resizeObserver.observe(container);
+
+		return () => {
+			resizeObserver.disconnect();
+		};
+	}, [computeLabels]);
+
+	const handleChange = useCallback(
+		(e: React.ChangeEvent<HTMLInputElement>) => {
+			const idx = parseInt(e.target.value, 10);
+			onSelect(idx);
 		},
-		[dayCount, dayGroups, selectedIndex]
+		[onSelect],
 	);
 
-	const onPointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
-		const idx = calcIndexFromPointer(e.clientX);
-		onSelect(idx);
-		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-	};
-	const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
-		if (!(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return;
-		const idx = calcIndexFromPointer(e.clientX);
-		if (idx !== selectedIndex) onSelect(idx);
-	};
-
-	const onKey = (e: React.KeyboardEvent) => {
-		if (e.key === "ArrowLeft") {
-			onSelect(Math.max(0, selectedIndex - 1));
-			e.preventDefault();
-		} else if (e.key === "ArrowRight") {
-			onSelect(Math.min(totalItems - 1, selectedIndex + 1));
-			e.preventDefault();
-		}
-	};
-
-	// Compute thumb visual position (non-linear). We place the thumb at the tick location.
-	const thumbStyle = (() => {
-		const meta = indexMeta[selectedIndex];
-		if (!meta) return { left: "0%" };
-		const dayWidth = 100 / dayCount;
-		const withinPos = meta.withinCount === 1 ? 0.5 : meta.withinIdx / (meta.withinCount - 1);
-		const leftPct = meta.dayIdx * dayWidth + withinPos * dayWidth;
-		return { left: `${leftPct}%` };
-	})();
-
-	if (!dayCount) return null;
+	if (!totalItems) return null;
 
 	return (
-		<div className="pointer-events-auto select-none text-neutral-100 bg-neutral-800/40 rounded px-4 pt-1 pb-1" aria-label="Timeline">
-			<div
-				ref={trackRef}
-				className="relative h-10"
-				onPointerDown={onPointerDown}
-				onPointerMove={onPointerMove}
-				role="slider"
-				tabIndex={0}
-				aria-valuemin={0}
-				aria-valuemax={totalItems - 1}
-				aria-valuenow={selectedIndex}
-				aria-label="Time slider"
-				onKeyDown={onKey}
-			>
-				{/* Day segments */}
-				<div className="absolute inset-x-0 top-1 h-4 flex">
-					{dayGroups.map((g, di) => (
-						<div key={g.key} className="relative flex-1 bg-neutral-700/30">
-							{g.items.map((it, wi) => {
-								const len = g.items.length;
-								const pos = len === 1 ? 0.5 : wi / (len - 1);
-								return (
-									<div
-										key={it.index}
-										title={it.date.toLocaleString(navigator.language)}
-										onClick={(e) => {
-											e.stopPropagation();
-											onSelect(it.index);
-										}}
-										className={`absolute -translate-x-1/2 cursor-pointer rounded ${it.index === selectedIndex ? "h-4 w-1 bg-indigo-400" : "h-3 w-px bg-neutral-400/60 hover:bg-neutral-200"}`}
-										style={{ left: `${pos * 100}%`, top: it.index === selectedIndex ? 0 : 2 }}
-									/>
-								);
-							})}
-							{/* Day label */}
-							<div className="absolute left-1/2 top-5 -translate-x-1/2 whitespace-nowrap text-[10px] text-neutral-300">
-								{g.key}
-							</div>
+		<div className="pointer-events-auto select-none text-neutral-100 bg-neutral-800/40 rounded px-8 pt-1 pb-1" aria-label="Timeline">
+			<div className="relative h-10">
+				{/* Styled range input */}
+				<input
+					type="range"
+					ref={containerRef}
+					min={0}
+					max={totalItems - 1}
+					step={1}
+					value={selectedIndex}
+					onChange={handleChange}
+					className="absolute inset-0 w-full h-6 appearance-none bg-transparent cursor-pointer timeline-slider border-1"
+					style={{
+						WebkitAppearance: "none",
+						background: "transparent",
+					}}
+					role="slider"
+					tabIndex={0}
+					aria-valuemin={0}
+					aria-valuemax={totalItems - 1}
+					aria-valuenow={selectedIndex}
+					aria-label="Time slider"
+				/>
+				{/* Date labels */}
+				<div className="absolute top-6 left-0 right-0">
+					{labelData.map(({ index, left, text, leftPercent, alignment }) => (
+						<div
+							key={index}
+							className="absolute text-[10px] text-neutral-300 whitespace-nowrap border-1"
+							style={{
+								left: leftPercent ? `${left}%` : `${left}px`,
+								transform: "translateX(-50%)",
+								width: 46,
+								textAlign: alignment === "center" ? "center" : undefined,
+							}}
+						>
+							{text}
 						</div>
 					))}
 				</div>
-				{/* Thumb */}
-				<div
-					className="absolute top-0 h-6 w-3 -translate-x-1/2 cursor-grab rounded-full border border-indigo-300/50 bg-indigo-400/80 shadow ring-2 ring-indigo-300/30"
-					style={thumbStyle}
-					aria-hidden
-				/>
 			</div>
 		</div>
 	);
