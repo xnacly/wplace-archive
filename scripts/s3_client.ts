@@ -30,7 +30,7 @@ export const awsS3 = new AWSClient({
 	forcePathStyle: true,
 	expectContinueHeader: false,
 	requestHandler: {
-		requestTimeout: 1000 * 15,
+		// requestTimeout: 1000 * 60 * 5,
 		httpsAgent: { maxSockets: 1000 },
 	},
 });

@@ -1,51 +1,58 @@
 {
-	"name": "wplace",
-	"module": "index.ts",
-	"type": "module",
-	"private": true,
-	"scripts": {
-		"dev": "vite",
-		"build": "tsc -b && vite build",
-		"preview": "vite preview --host 0.0.0.0"
-	},
-	"devDependencies": {
-		"@types/bun": "^1.2.20",
-		"@types/canvas-size": "^1.2.2",
-		"@types/node": "^24.3.0",
-		"@types/tar-fs": "^2.0.4",
-		"autoprefixer": "^10.4.20",
-		"postcss": "^8.4.47",
-		"tailwindcss": "^4.1.12"
-	},
-	"peerDependencies": {
-		"@types/react": "^19.1.10",
-		"@types/react-dom": "^19.1.7",
-		"@vitejs/plugin-react": "^5.0.0",
-		"globals": "^16.3.0",
-		"typescript": "^5.9.2",
-		"vite": "^7.1.2"
-	},
-	"dependencies": {
-		"@aws-sdk/client-s3": "^3.916.0",
-		"@aws-sdk/s3-request-presigner": "^3.917.0",
-		"@tailwindcss/vite": "^4.1.12",
-		"axios": "^1.11.0",
-		"canvas-size": "^2.0.0",
-		"framer-motion": "^12.23.12",
-		"freebind": "^0.2.2",
-		"gunzip-maybe": "^1.4.2",
-		"http-proxy-agent": "^7.0.2",
-		"https-proxy-agent": "^7.0.6",
-		"maplibre-gl": "^5.7.1",
-		"octokit": "^5.0.4",
-		"p-queue": "^8.1.0",
-		"proxy-agent": "^6.5.0",
-		"react": "^19.1.1",
-		"react-dom": "^19.1.1",
-		"sharp": "^0.34.3",
-		"tar": "^7.5.1",
-		"tar-fs": "^3.1.0",
-		"tar-stream": "^3.1.7",
-		"undici": "^7.15.0"
-	}
+  "name": "wplace",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.20",
+    "@types/canvas-size": "^1.2.2",
+    "@types/node": "^24.3.0",
+    "@types/tar-fs": "^2.0.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^4.1.12"
+  },
+  "peerDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.0",
+    "globals": "^16.3.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.916.0",
+    "@aws-sdk/s3-request-presigner": "^3.917.0",
+    "@inkjs/ui": "^2.0.0",
+    "@tailwindcss/vite": "^4.1.12",
+    "axios": "^1.11.0",
+    "canvas-size": "^2.0.0",
+    "framer-motion": "^12.23.12",
+    "freebind": "^0.2.2",
+    "gunzip-maybe": "^1.4.2",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "ink": "^6.4.0",
+    "maplibre-gl": "^5.7.1",
+    "mobx": "^6.15.0",
+    "mobx-react": "^9.2.1",
+    "octokit": "^5.0.4",
+    "p-queue": "^8.1.0",
+    "proxy-agent": "^6.5.0",
+    "react": "19.2",
+    "react-dom": "19.2",
+    "sharp": "^0.34.3",
+    "tar": "^7.5.1",
+    "tar-fs": "^3.1.0",
+    "tar-stream": "^3.1.7",
+    "undici": "^7.15.0"
+  },
+  "trustedDependencies": [
+    "@nodegui/nodegui"
+  ]
 }

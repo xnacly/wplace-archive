@@ -52,7 +52,7 @@ function expandTemplate(
 		z: string | number;
 		x: string | number;
 		y: string | number;
-	}
+	},
 ) {
 	// handle subdomains like {a,b,c} or {s}
 	let urls = [template];
@@ -70,7 +70,7 @@ function expandTemplate(
 	// standard placeholders
 	urls = urls.map(
 		(u) =>
-			u.replace(/\{z\}/g, t.z.toString()).replace(/\{x\}/g, t.x.toString()).replace(/\{y\}/g, t.y.toString()).replace(/\{s\}/g, "a") // pick a default subdomain if {s}
+			u.replace(/\{z\}/g, t.z.toString()).replace(/\{x\}/g, t.x.toString()).replace(/\{y\}/g, t.y.toString()).replace(/\{s\}/g, "a"), // pick a default subdomain if {s}
 	);
 
 	return urls;
@@ -84,7 +84,7 @@ async function* stitchTilesToCanvas(
 	}[],
 	template: string,
 	tileSize = 1000,
-	canvas?: OffscreenCanvas
+	canvas?: OffscreenCanvas,
 ) {
 	const cols = Math.max(...tiles.map((t) => t.x)) - Math.min(...tiles.map((t) => t.x)) + 1;
 	const rows = Math.max(...tiles.map((t) => t.y)) - Math.min(...tiles.map((t) => t.y)) + 1;
@@ -104,7 +104,7 @@ async function* stitchTilesToCanvas(
 
 	if (targetWidth * targetHeight > maxRes) {
 		throw new Error(
-			`Please zoom further in to reduce the image size.\nThe requested image is ${targetWidth}x${targetHeight} pixels, which exceeds the maximum possible size of your browser ${maxArea.width}x${maxArea.height} pixels.`
+			`Please zoom further in to reduce the image size.\nThe requested image is ${targetWidth}x${targetHeight} pixels, which exceeds the maximum possible size of your browser ${maxArea.width}x${maxArea.height} pixels.`,
 		);
 	}
 
@@ -180,4 +180,32 @@ export async function logTileUrls(map: Map) {
 	}
 
 	console.log(urls); // direct tile image URLs you can fetch
+}
+
+export function debounce(fn: (...args: any[]) => void, delay: number) {
+	let timeoutId: number | undefined;
+	return (...args: any[]) => {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+		timeoutId = window.setTimeout(() => {
+			fn(...args);
+		}, delay);
+	};
+}
+
+export function throttle(fn: (...args: any[]) => void, limit: number) {
+	let inThrottle: boolean;
+	return (...args: any[]) => {
+		if (!inThrottle) {
+			fn(...args);
+			inThrottle = true;
+			setTimeout(() => (inThrottle = false), limit);
+		}
+	};
+}
+
+export function inBounds(lat: number, lon: number, bounds: [number, number, number, number]) {
+	const [south, west, north, east] = bounds;
+	return lat >= south && lat <= north && lon >= west && lon <= east;
 }

@@ -1,12 +1,13 @@
 import { useLayoutEffect, useState, useRef, useCallback, useMemo, useEffect, AnchorHTMLAttributes } from "react";
 import Timeline from "./Timeline";
-import { addProtocol, ColorSpecification, LayerSpecification, Map } from "maplibre-gl";
+import { addProtocol, ColorSpecification, LayerSpecification, LngLat, LngLatBounds, Map } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "./Timeline.css";
 import "./App.css";
 import layers from "./mapstyle.json";
 import layersDark from "./mapstyle_dark.json";
 import "./util";
-import { getImageFromMap } from "./util";
+import { getImageFromMap, inBounds } from "./util";
 import { BankTransfer } from "./BankTransfer";
 import { Donate } from "./Donate";
 import { About } from "./About";
@@ -29,6 +30,19 @@ const timeStrings: string[] = [
 	"2025-08-09T20:01:14.231Z",
 ];
 const defaultTimes = timeStrings.map((s) => new Date(s));
+
+let franceTimes = [] as Date[];
+
+const franceStart = new Date("2025-08-13T22:00:00Z");
+const now = new Date();
+let time = franceStart;
+
+while (time < now) {
+	franceTimes.push(new Date(time));
+	time = new Date(time.getTime() + 30 * 60 * 1000); // +30 minutes
+}
+
+franceTimes = franceTimes.reverse();
 
 type Theme = "light" | "dark";
 
@@ -58,6 +72,13 @@ function timeSlug(d: Date) {
 
 	// Folder naming: replace ':' with '-' to be filesystem friendly, keep milliseconds & Z
 	return toISOString(d).replace(/:/g, "-");
+}
+
+function timeSlugFrance(d: Date) {
+	if (!d) return "";
+	if (isNaN(d.getTime())) return "now";
+
+	return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}-${d.getHours().toString().padStart(2, "0")}h${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function recoverIsoFromSlug(slug: string) {
@@ -102,6 +123,7 @@ function App() {
 	const [isDonateOpen, setIsDonateOpen] = useState(false);
 	const [isCryptoOpen, setIsCryptoOpen] = useState(false);
 	const [isBankTransferOpen, setIsBankTransferOpen] = useState(false);
+	let [times, setTimes] = useState<Date[]>(defaultTimes);
 
 	const [isTakingScreenshot, setIsTakingScreenshot] = useState(false);
 	const progressBarRef = useRef<HTMLProgressElement>(null);
@@ -154,23 +176,17 @@ function App() {
 
 		window.open(link, "_blank");
 	}, []);
+	let [selectedIndex, setSelectedIndex] = useState(0);
 
 	const themeButtonLabel = isDarkTheme ? "Switch to light mode" : "Switch to dark mode";
 
 	// On first render, parse hash for initial state (center, zoom, time)
-	const initialViewRef = useRef<{ center?: [number, number]; zoom?: number }>({});
-	let pendingIndex = 0;
-	if (!initialViewRef.current.center) {
-		const params = parseHash();
-		const p = applyHashParams(params, initialViewRef.current);
-		pendingIndex = p.index || 0;
-	}
-	const [selectedIndex, setSelectedIndex] = useState(pendingIndex);
+	const initialView = useRef<{ center?: [number, number]; zoom?: number }>({}).current;
 
 	// Helper to apply hash params to view/time state
 	function applyHashParams(
 		params: Record<string, string>,
-		view: { center?: [number, number]; zoom?: number; time?: string; index?: number } = {}
+		view: { center?: [number, number]; zoom?: number; time?: string; index?: number; timeUnix?: number } = {},
 	) {
 		const lat = params.lat ? parseFloat(params.lat) : undefined;
 		const lng = params.lng ? parseFloat(params.lng) : undefined;
@@ -179,10 +195,14 @@ function App() {
 		if (isFinite(z!)) view.zoom = z!;
 		view.time = params.time;
 
-		let idx = defaultTimes.findIndex((t) => timeSlug(t) === params.time);
+		if (params.time) {
+			view.timeUnix = new Date(recoverIsoFromSlug(params.time)).getTime();
+		}
+
+		let idx = times.findIndex((t) => timeSlug(t) === params.time);
 		if (idx === -1 && params.time) {
 			const isoCandidate = recoverIsoFromSlug(params.time);
-			idx = defaultTimes.findIndex((t) => toISOString(t) === isoCandidate);
+			idx = times.findIndex((t) => toISOString(t) === isoCandidate);
 		}
 
 		view.index = idx !== -1 ? idx : 0;
@@ -190,45 +210,8 @@ function App() {
 		return view;
 	}
 
-	// Wrapper applying params directly to a live map instance
-	const applyParamsToMap = useCallback((params: Record<string, string>) => {
-		const m = mapRef.current;
-		const view = applyHashParams(params, {});
-		if (!m) return;
-		if (view.center) m.setCenter(view.center);
-		if (view.zoom !== undefined) m.setZoom(view.zoom);
-	}, []);
-
-	// Central hash sync (uses current map + selected time)
-	const syncHash = useEvent(
-		(index = selectedIndex, selChanged = selectionChanged) => {
-			if (typeof index !== "number") index = selectedIndex;
-			const m = mapRef.current;
-			if (!m) return;
-			const c = m.getCenter();
-			const z = m.getZoom();
-			const currentTimeLocal = defaultTimes[index];
-			const slug = timeSlug(currentTimeLocal);
-			const newHash = buildHash({ z: z.toFixed(2), lat: c.lat.toFixed(5), lng: c.lng.toFixed(5), time: slug });
-			if (window.location.hash !== newHash) window.history.replaceState(null, "", newHash);
-			setSelectionChanged(false);
-
-			if (selChanged) return;
-
-			// unload all other layers which aren't active
-			const otherLayers = m.getStyle()?.layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
-			otherLayers.forEach((l) => {
-				const otherLayer = m.getLayer(l.id);
-				if (!otherLayer) return;
-
-				m.setLayoutProperty(l.id, "visibility", "none");
-			});
-		},
-		[selectedIndex, selectionChanged]
-	);
-
-	const currentTime = defaultTimes[selectedIndex];
-	const currentSlug = timeSlug(currentTime);
+	const currentTime = times[selectedIndex];
+	let currentSlug = timeSlug(currentTime);
 
 	useLayoutEffect(() => {
 		const map = new Map({
@@ -260,7 +243,22 @@ function App() {
 									maxzoom: 11,
 								},
 							];
-						})
+						}),
+					),
+					...Object.fromEntries(
+						franceTimes.map((time) => {
+							return [
+								`tiles-${timeSlug(time)}`,
+								{
+									type: "raster",
+									tiles: [`https://wplace.zapto.zip/api/tiles/{x}/{y}/${timeSlugFrance(time)}.png`],
+									// tileSize: TILE_SIZE,
+									scheme: "xyz",
+									maxzoom: 11,
+									// minzoom: 11,
+								},
+							];
+						}),
 					),
 				},
 				layers: [
@@ -281,7 +279,7 @@ function App() {
 						l.layout.visibility = isDarkTheme ? "visible" : "none";
 						return l;
 					}),
-					...defaultTimes.map((x) => {
+					...[...defaultTimes, ...franceTimes].map((x) => {
 						const visibility = timeSlug(x) === currentSlug ? "visible" : "none";
 
 						return {
@@ -301,8 +299,8 @@ function App() {
 				],
 			},
 			renderWorldCopies: false,
-			center: initialViewRef.current.center || [0, WORLD_N / 3],
-			zoom: initialViewRef.current.zoom ?? 2,
+			center: initialView.center || [0, WORLD_N / 3],
+			zoom: initialView.zoom ?? 2,
 		});
 
 		mapRef.current = map;
@@ -326,19 +324,7 @@ function App() {
 		// re-create map only once; time changes handled separately
 	}, []);
 
-	useLayoutEffect(() => {
-		const map = mapRef.current;
-		if (!map) return;
-
-		map.on("moveend", syncHash);
-
-		return () => {
-			map.off("moveend", syncHash);
-		};
-	}, [syncHash]);
-
-	// Update raster source when the selected time changes
-	useLayoutEffect(() => {
+	const updateVisiblityLayers = useEvent(function updateVisiblityLayers() {
 		if (!currentSlug) return;
 
 		const map = mapRef.current;
@@ -349,23 +335,163 @@ function App() {
 
 		map.setLayoutProperty(`tiles-${currentSlug}`, "visibility", "visible");
 		map.setPaintProperty(`tiles-${currentSlug}`, "raster-opacity", 1);
+		const interval = setInterval(() => {
+			if (map.areTilesLoaded()) {
+				clearInterval(interval);
 
-		const otherLayers = map.getStyle().layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
-		otherLayers.forEach((l) => {
-			const otherLayer = map.getLayer(l.id);
-			if (!otherLayer) return;
+				const otherLayers =
+					map.getStyle().layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
+				otherLayers.forEach((l) => {
+					const otherLayer = map.getLayer(l.id);
+					if (!otherLayer) return;
 
-			map.setPaintProperty(l.id, "raster-opacity", 0);
-			if (selectionChanged) {
-				setTimeout(() => {
-					map.setLayoutProperty(l.id, "visibility", "visible");
-				}, 100);
+					map.setPaintProperty(l.id, "raster-opacity", 0);
+					if (selectionChanged) {
+						setTimeout(() => {
+							// map.setLayoutProperty(l.id, "visibility", "visible");
+						}, 100);
+					}
+				});
+
+				map.triggerRepaint();
 			}
-		});
+		}, 30);
 
-		setTimeout(() => {
+		return interval;
+	});
+
+	const syncTimes = useEvent((c?: LngLat, z?: number, selectedTime?: number) => {
+		if (!c || z === undefined) {
+			const map = mapRef.current;
+			if (!map) return;
+
+			c = map.getCenter();
+			z = map.getZoom();
+		}
+
+		// inBounds(lat, lng, south, west, north, east) — Metropolitan France (incl. Corsica) with small margin
+		const inFrance =
+			inBounds(c.lat, c.lng, [
+				35.79829, // south
+				-10.02003, // west
+				51.50873, // north
+				6.67969, // east
+			]) && z >= 11;
+
+		let newTimes = times;
+
+		if (inFrance) {
+			newTimes = franceTimes;
+		} else {
+			newTimes = defaultTimes;
+		}
+
+		if (newTimes !== times) {
+			if (!selectedTime) selectedTime = times[selectedIndex]?.getTime() || Date.now();
+
+			times = newTimes;
+			setTimes(newTimes);
+
+			// find nearest time index
+			let nearestIndex = 0;
+			let nearestDiff = Infinity;
+			newTimes.forEach((t, idx) => {
+				const diff = Math.abs(t.getTime() - selectedTime!);
+				if (diff < nearestDiff) {
+					nearestDiff = diff;
+					nearestIndex = idx;
+				}
+			});
+			if (nearestIndex !== selectedIndex) {
+				setSelectedIndex(nearestIndex);
+				selectedIndex = nearestIndex;
+				currentSlug = timeSlug(newTimes[nearestIndex]);
+				updateVisiblityLayers();
+			}
+		}
+	});
+
+	// Wrapper applying params directly to a live map instance
+	const applyParamsToMap = useCallback((params: Record<string, string>) => {
+		const m = mapRef.current;
+		const view = applyHashParams(params, {});
+		if (!m) return;
+		if (view.center) m.setCenter(view.center);
+		if (view.zoom !== undefined) m.setZoom(view.zoom);
+
+		syncTimes();
+	}, []);
+
+	// Central hash sync (uses current map + selected time)
+	const syncHash = useEvent(
+		(index = selectedIndex, selChanged = selectionChanged) => {
+			if (typeof index !== "number") index = selectedIndex;
+			const map = mapRef.current;
+			if (!map) return;
+
+			const c = map.getCenter();
+			const z = map.getZoom();
+			const currentTimeLocal = times[index];
+			const slug = timeSlug(currentTimeLocal);
+			const newHash = buildHash({ z: z.toFixed(2), lat: c.lat.toFixed(5), lng: c.lng.toFixed(5), time: slug });
+			if (window.location.hash !== newHash) window.history.replaceState(null, "", newHash);
+			setSelectionChanged(false);
+
+			if (selChanged) return;
+
+			// unload all other layers which aren't active
+			const otherLayers = map.getStyle()?.layers?.filter((l) => l.id.startsWith("tiles-") && l.id !== `tiles-${currentSlug}`) || [];
+			otherLayers.forEach((l) => {
+				const otherLayer = map.getLayer(l.id);
+				if (!otherLayer) return;
+
+				map.setLayoutProperty(l.id, "visibility", "none");
+			});
+		},
+		[selectedIndex, selectionChanged],
+	);
+
+	if (!initialView.center) {
+		const params = parseHash();
+		const p = applyHashParams(params, initialView);
+		let pendingIndex = p.index || 0;
+		if (p.center) {
+			syncTimes(
+				{
+					lat: p.center[1],
+					lng: p.center[0],
+				},
+				p.zoom || 2,
+				p.timeUnix,
+			);
+		}
+		if (p.index !== pendingIndex) setSelectedIndex(pendingIndex);
+	}
+
+	useLayoutEffect(() => {
+		const map = mapRef.current;
+		if (!map) return;
+
+		const remove = map.on("moveend", syncHash);
+		const remove2 = map.on("moveend", () => syncTimes());
+
+		return () => {
+			remove.unsubscribe();
+			remove2.unsubscribe();
+		};
+	}, [syncHash]);
+
+	// Update raster source when the selected time changes
+	useLayoutEffect(() => {
+		const map = mapRef.current;
+		if (!map || !mapReadyRef.current) return;
+
+		const interval = updateVisiblityLayers();
+
+		return () => {
 			map.triggerRepaint();
-		}, 150);
+			clearInterval(interval);
+		};
 	}, [currentSlug, forceUpdate]);
 
 	const onSelect = useCallback((idx: number) => {
@@ -439,7 +565,7 @@ function App() {
 			new google.translate.TranslateElement(
 				// @ts-ignore
 				{ pageLanguage: "en", layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL },
-				"google_translate_element"
+				"google_translate_element",
 			);
 		};
 		const script = document.createElement("script");
@@ -507,30 +633,6 @@ function App() {
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [isBankTransferOpen, closeBankTransfer]);
-
-	// Group times by calendar day (YYYY-MM-DD) preserving original order
-	interface DayGroup {
-		key: string;
-		date: Date;
-		items: { date: Date; index: number }[];
-	}
-	const dayGroups = useMemo<DayGroup[]>(() => {
-		const dayMap = new globalThis.Map<string, DayGroup>();
-		for (let i = 0; i < defaultTimes.length; i++) {
-			const d = defaultTimes[i];
-
-			let key = d.toLocaleDateString(navigator.language, {
-				month: "short",
-				day: "2-digit",
-			}); // YYYY-MM-DD
-
-			if (isNaN(d.getTime())) key = "Now";
-
-			if (!dayMap.has(key)) dayMap.set(key, { key, date: new Date(key + "T00:00:00Z"), items: [] });
-			dayMap.get(key)!.items.push({ date: d, index: i });
-		}
-		return Array.from(dayMap.values());
-	}, [defaultTimes]);
 
 	return (
 		<>
@@ -668,7 +770,7 @@ function App() {
 			)}
 			{/* Timeline overlay */}
 			<div className="absolute left-0 right-0 bottom-0 z-10 bg-gradient-to-t from-neutral-900/80 to-neutral-900/40">
-				<Timeline dayGroups={dayGroups} selectedIndex={selectedIndex} onSelect={onSelect} />
+				<Timeline dates={times} selectedIndex={selectedIndex} onSelect={onSelect} />
 			</div>
 			{isAboutOpen && <About closeAbout={closeAbout} mapRef={mapRef} openBankTransfer={openBankTransfer} openDonate={openDonate} />}
 			{isBankTransferOpen && <BankTransfer closeBankTransfer={closeBankTransfer} />}
