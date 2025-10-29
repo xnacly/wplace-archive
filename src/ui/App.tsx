@@ -251,7 +251,9 @@ function App() {
 								`tiles-${timeSlug(time)}`,
 								{
 									type: "raster",
-									tiles: [`https://wplace.zapto.zip/api/tiles/{x}/{y}/${timeSlugFrance(time)}.png`],
+									tiles: [
+										`https://wplace.zapto.zip/api/tiles/{x}/{y}/${timeSlugFrance(time)}.png?cache=true&best-effort=true`,
+									],
 									// tileSize: TILE_SIZE,
 									scheme: "xyz",
 									maxzoom: 11,
