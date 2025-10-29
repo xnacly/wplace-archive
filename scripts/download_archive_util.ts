@@ -9,10 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export async function downloadArchive(repo: string = "murolem/wplace-archives", releaseTag?: string, outDir = __dirname + "/../archive") {
-	const { data } = await axios(`https://api.github.com/repos/${repo}/releases/tags/${releaseTag || "latest"}`);
+	const { data: release } = await axios(`https://api.github.com/repos/${repo}/releases/tags/${releaseTag || "latest"}`);
 
-	const release_tag_name = releaseTag || data[0].tag_name;
-	const release = data.find((r: any) => r.tag_name === release_tag_name);
+	const release_tag_name = releaseTag || release.tag_name;
 
 	const { assets } = release;
 
@@ -64,7 +63,7 @@ export async function downloadArchive(repo: string = "murolem/wplace-archives", 
 				attempt++;
 				if (attempt < maxRetries) {
 					process.stdout.write(
-						`\nError downloading ${asset.name} (attempt ${attempt}): ${err.code || err.message}. Retrying...\n`
+						`\nError downloading ${asset.name} (attempt ${attempt}): ${err.code || err.message}. Retrying...\n`,
 					);
 					await new Promise((res) => setTimeout(res, 2000 * attempt));
 				} else {
