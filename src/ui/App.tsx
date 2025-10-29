@@ -19,6 +19,7 @@ const WORLD_N = 85.0511287798066; // top latitude in EPSG:3857
 
 // Times available for the time-travel tile layers. Use valid ISO strings (Map overlay folders use ':' replaced by '-').
 const timeStrings: string[] = [
+	"2025-10-24T23:09:24.923Z"
 	"2025-10-18T07:23:59.887Z",
 	"2025-10-11T13:55:18.919Z",
 	"2025-10-04T12:28:23.768Z",
