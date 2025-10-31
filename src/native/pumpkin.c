@@ -97,35 +97,36 @@ static napi_value js_find_pumpkin(napi_env env, napi_callback_info info) {
   return obj;
 }
 
-static napi_value js_clear_pumpkin(napi_env env, napi_callback_info info) {
-  pumpkin_clear(&g_pumpkin);
+static napi_value js_destroy_pumpkin(napi_env env, napi_callback_info info) {
+  pumpkin_destroy(&g_pumpkin);
   return NULL;
 }
 
-static void addon_cleanup(void *arg) {
+static void addon_destroy(void *arg) {
   (void)arg;
-  pumpkin_clear(&g_pumpkin);
+  pumpkin_destroy(&g_pumpkin);
 }
 
 static napi_value init(napi_env env, napi_value exports) {
   napi_value set_fn;
-
   NAPI_CALL(env, napi_create_function(env, "setPumpkinData", NAPI_AUTO_LENGTH,
-                                      js_set_pumpkin, NULL, &fn));
-  NAPI_CALL(env, napi_set_named_property(env, exports, "setPumpkinData", fn));
+                                      js_set_pumpkin, NULL, &set_fn));
+  NAPI_CALL(env,
+            napi_set_named_property(env, exports, "setPumpkinData", set_fn));
 
   napi_value find_fn;
   NAPI_CALL(env, napi_create_function(env, "findPumpkin", NAPI_AUTO_LENGTH,
                                       js_find_pumpkin, NULL, &find_fn));
   NAPI_CALL(env, napi_set_named_property(env, exports, "findPumpkin", find_fn));
 
-  napi_value clear_fn;
-  NAPI_CALL(env, napi_create_function(env, "clearPumpkinData", NAPI_AUTO_LENGTH,
-                                      js_clear_pumpkin, NULL, &clear_fn));
-  NAPI_CALL(
-      env, napi_set_named_property(env, exports, "clearPumpkinData", clear_fn));
+  napi_value destroy_fn;
+  NAPI_CALL(env,
+            napi_create_function(env, "destoryPumpkinData", NAPI_AUTO_LENGTH,
+                                 js_destroy_pumpkin, NULL, &destroy_fn));
+  NAPI_CALL(env, napi_set_named_property(env, exports, "destoryPumpkinData",
+                                         destroy_fn));
 
-  NAPI_CALL(env, napi_add_env_cleanup_hook(env, addon_cleanup, NULL));
+  NAPI_CALL(env, napi_add_env_cleanup_hook(env, addon_destroy, NULL));
   return exports;
 }
 
