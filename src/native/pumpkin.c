@@ -59,7 +59,7 @@ static napi_value js_find_pumpkin(napi_env env, napi_callback_info info) {
   napi_value argv[4];
   NAPI_CALL(env, napi_get_cb_info(env, info, &argc, argv, NULL, NULL));
 
-  if (!g_pumpkin.pixels) {
+  if (!g_pumpkin.rgba) {
     napi_throw_error(env, NULL, "Pumpkin not initialized");
     return NULL;
   }

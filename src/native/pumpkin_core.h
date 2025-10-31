@@ -11,7 +11,9 @@ typedef struct {
 } sample_pixel_t;
 
 typedef struct {
-  sample_pixel_t *pixels;
+  uint16_t *dx;   // array of x offsets
+  uint16_t *dy;   // array of y offsets
+  uint32_t *rgba; // array of packed RGBA pixels as uint32_t
   size_t pixel_count;
   uint32_t width;
   uint32_t height;
