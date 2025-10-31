@@ -373,7 +373,7 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 						{pumpkins.map((entry) => {
 							const isNew = highlightedKeys.has(entry.key);
 							const isVisited = visitedPumpkins.get(entry.key);
-							const visitedThisHour = isVisited && isVisited.getTime() >= thisHour.getTime();
+							// const visitedThisHour = isVisited && isVisited.getTime() >= thisHour.getTime();
 
 							return (
 								<div
@@ -382,7 +382,7 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 										isNew
 											? "border-amber-400 shadow-lg shadow-amber-400/30 bg-amber-50/70"
 											: "border-neutral-200 bg-white/80"
-									} ${visitedThisHour ? "opacity-50" : ""}`}
+									} ${isVisited ? "opacity-50" : ""}`}
 								>
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-2 font-semibold text-neutral-800">
@@ -395,7 +395,7 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 													New
 												</span>
 											)}
-											{visitedThisHour && (
+											{isVisited && (
 												<span className="rounded bg-green-500/80 px-2 py-0.5 text-[0.65rem] font-semibold uppercase text-white tracking-wider flex items-center gap-1">
 													<svg
 														xmlns="http://www.w3.org/2000/svg"
