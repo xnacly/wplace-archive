@@ -41,6 +41,7 @@ const workerConcurrency =
 
 type WorkerMessage =
 	| { type: "match"; data: TileMatch }
+	| { type: "no_match" }
 	| {
 		type: "error";
 		data: { tileX?: number; tileY?: number; message: string };
@@ -49,6 +50,8 @@ type WorkerMessage =
 		type: "done";
 		data: { startY: number; endY: number; maxX: number };
 	};
+
+let tilesCounter = 0
 
 async function spawnWorker(
 	startY: number,
@@ -73,7 +76,12 @@ async function spawnWorker(
 				return;
 			}
 
+			tilesCounter += 1
+
 			switch (message.type) {
+				case "no_match": {
+					break
+				}
 				case "match": {
 					onMatch(message.data);
 					break;
@@ -120,6 +128,12 @@ async function main() {
 	let currentIPOffset = 1n;
 
 	console.log({ workerCount, rowsPerWorker, ipOffsetsPerWorker });
+
+	setInterval(() => {
+		const tilesPerSecond = (tilesCounter / 5).toFixed(1)
+		process.stdout.write(`\rProcessed tiles: ${tilesCounter} (${tilesPerSecond} tiles/sec)   `)
+		tilesCounter = 0
+	}, 5000);
 
 	for (let index = 0; index < workerCount; index += 1) {
 		const startY = index * rowsPerWorker;

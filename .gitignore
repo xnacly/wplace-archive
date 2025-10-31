@@ -44,3 +44,5 @@ vips-properties.xml
 *.txt
 
 build/
+
+demo-visited-feature.html
