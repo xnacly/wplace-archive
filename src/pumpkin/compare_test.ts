@@ -13,5 +13,8 @@ const test = await sharp(join(__dirname, "search.png")).ensureAlpha().raw().toBu
 console.log(await hasPumpkin(test))
 
 console.time("test")
-console.log(await hasPumpkin(test))
+
+for (let i = 0; i < 1000; i++) {
+	await hasPumpkin(test)
+}
 console.timeEnd("test")

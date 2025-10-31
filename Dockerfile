@@ -8,7 +8,7 @@ RUN bun install
 
 COPY . .
 
-RUN bun run build
+RUN bun run build --ignore-scripts
 
 EXPOSE 4173
 

@@ -56,7 +56,6 @@
   },
   "trustedDependencies": [
     "@nodegui/nodegui",
-    "@tailwindcss/oxide",
-    "syscall-napi"
+    "@tailwindcss/oxide"
   ]
 }

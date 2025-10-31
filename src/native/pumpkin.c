@@ -177,6 +177,8 @@ static napi_value find_pumpkin(napi_env env, napi_callback_info info) {
 	for (uint32_t sy = 0; sy <= max_y; sy++) {
 		for (uint32_t sx = 0; sx <= max_x; sx++) {
 			bool matched = true;
+			uint32_t found_x = 0;
+			uint32_t found_y = 0;
 
 			for (size_t i = 0; i < pumpkin_pixel_count; i++) {
 				const sample_pixel_t *sample = &pumpkin_pixels[i];
@@ -194,6 +196,11 @@ static napi_value find_pumpkin(napi_env env, napi_callback_info info) {
 					matched = false;
 					break;
 				}
+
+				if (i == 0) {
+					found_x = (uint32_t)sx + (uint32_t)sample->dx;
+					found_y = (uint32_t)sy + (uint32_t)sample->dy;
+				}
 			}
 
 			if (matched) {
@@ -202,8 +209,8 @@ static napi_value find_pumpkin(napi_env env, napi_callback_info info) {
 
 				napi_value x_value;
 				napi_value y_value;
-				NAPI_CALL(env, napi_create_uint32(env, sx + (uint32_t)first_pixel_dx, &x_value));
-				NAPI_CALL(env, napi_create_uint32(env, sy + (uint32_t)first_pixel_dy, &y_value));
+				NAPI_CALL(env, napi_create_uint32(env, found_x, &x_value));
+				NAPI_CALL(env, napi_create_uint32(env, found_y, &y_value));
 
 				NAPI_CALL(env, napi_set_named_property(env, result, "x", x_value));
 				NAPI_CALL(env, napi_set_named_property(env, result, "y", y_value));

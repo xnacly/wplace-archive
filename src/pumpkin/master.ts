@@ -26,7 +26,7 @@ try {
 }
 
 try {
-	pumpkins = readFileSync(pumpkinJsonPath, 'utf-8')
+	pumpkins = JSON.parse(readFileSync(pumpkinJsonPath, 'utf-8'))
 } catch (error) {
 }
 
@@ -151,7 +151,7 @@ async function main() {
 							tileY: match.tileY,
 							offsetX: match.offsetX,
 							offsetY: match.offsetY,
-							event: json.paintedBy.event
+							foundAt: new Date().toISOString(),
 						}
 
 						writeFileSync(pumpkinJsonPath, JSON.stringify(pumpkins, null, 2))
@@ -170,6 +170,8 @@ async function main() {
 	} else {
 		console.log(`Total pumpkins detected: ${matches.length}`);
 	}
+
+	setTimeout(() => main(), 0)
 }
 
 main();
