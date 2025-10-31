@@ -39,23 +39,34 @@ type PumpkinResponse = Record<string, PumpkinRaw>;
 
 const VISITED_PUMPKINS_KEY = "wplace-visited-pumpkins";
 
-function getVisitedPumpkins(): Set<string> {
-	if (typeof window === "undefined") return new Set();
+function getVisitedPumpkins(): Map<string, Date> {
+	let map = new Map<string, Date>();
+	if (typeof window === "undefined") return map;
 	try {
 		const stored = window.localStorage.getItem(VISITED_PUMPKINS_KEY);
-		if (stored) {
-			return new Set(JSON.parse(stored));
+		if (!stored) return map;
+
+		const parsed: Record<string, string> = JSON.parse(stored);
+		for (const [key, dateStr] of Object.entries(parsed)) {
+			const date = new Date(dateStr);
+			if (!isNaN(date.getTime())) {
+				map.set(key, date);
+			}
 		}
 	} catch (error) {
 		console.error("Failed to load visited pumpkins:", error);
 	}
-	return new Set();
+	return map;
 }
 
-function saveVisitedPumpkins(visited: Set<string>): void {
+function saveVisitedPumpkins(visited: Map<string, Date>): void {
 	if (typeof window === "undefined") return;
 	try {
-		window.localStorage.setItem(VISITED_PUMPKINS_KEY, JSON.stringify(Array.from(visited)));
+		let save = {} as Record<string, string>;
+		visited.forEach((date, key) => {
+			save[key] = date.toISOString();
+		});
+		window.localStorage.setItem(VISITED_PUMPKINS_KEY, JSON.stringify(save));
 	} catch (error) {
 		console.error("Failed to save visited pumpkins:", error);
 	}
@@ -67,7 +78,8 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 	const [error, setError] = useState<string | null>(null);
 	const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 	const [highlightedKeys, setHighlightedKeys] = useState<Set<string>>(() => new Set());
-	const [visitedPumpkins, setVisitedPumpkins] = useState<Set<string>>(() => getVisitedPumpkins());
+	const [visitedPumpkins] = useState(() => getVisitedPumpkins());
+	const [_, setForceUpdate] = useState(0);
 
 	const abortRef = useRef<AbortController | null>(null);
 	const knownKeysRef = useRef<Set<string>>(new Set());
@@ -124,7 +136,7 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 	const processResponse = useCallback(
 		(raw: PumpkinResponse) => {
 			const lastFullHour = new Date();
-			lastFullHour.setMinutes(0, 0, 0);
+			lastFullHour.setUTCMinutes(0, 0, 0);
 
 			let entries: PumpkinEntry[] = Object.entries(raw)
 				.map(([key, value]) => {
@@ -273,13 +285,11 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 		return `https://wplace.live/?lat=${entry.lat}&lng=${entry.lng}&zoom=${zoom}`;
 	}, []);
 
-	const handlePumpkinClick = useCallback((key: string) => {
-		setVisitedPumpkins((prev) => {
-			const updated = new Set(prev);
-			updated.add(key);
-			saveVisitedPumpkins(updated);
-			return updated;
-		});
+	const handlePumpkinClick = useCallback((key: string, date: Date) => {
+		visitedPumpkins.set(key, date);
+		saveVisitedPumpkins(visitedPumpkins);
+
+		setForceUpdate((v) => v + 1);
 	}, []);
 
 	const renderFound = useCallback(
@@ -295,6 +305,9 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 		},
 		[language],
 	);
+
+	const thisHour = new Date();
+	thisHour.setUTCMinutes(0, 0, 0);
 
 	return (
 		<div
@@ -359,7 +372,9 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 					<div className="pr-2" style={{}}>
 						{pumpkins.map((entry) => {
 							const isNew = highlightedKeys.has(entry.key);
-							const isVisited = visitedPumpkins.has(entry.key);
+							const isVisited = visitedPumpkins.get(entry.key);
+							const visitedThisHour = isVisited && isVisited.getTime() >= thisHour.getTime();
+
 							return (
 								<div
 									key={entry.key}
@@ -367,17 +382,20 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 										isNew
 											? "border-amber-400 shadow-lg shadow-amber-400/30 bg-amber-50/70"
 											: "border-neutral-200 bg-white/80"
-									} ${isVisited ? "opacity-50" : ""}`}
+									} ${visitedThisHour ? "opacity-50" : ""}`}
 								>
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-2 font-semibold text-neutral-800">
 											{entry.key}
+											<div className="text-neutral-500 text-xs font-normal">
+												{entry.foundDate && <div>Found at {renderFound(entry)}</div>}
+											</div>
 											{isNew && (
 												<span className="rounded bg-amber-400/80 px-2 py-0.5 text-[0.65rem] font-semibold uppercase text-amber-950 tracking-wider">
 													New
 												</span>
 											)}
-											{isVisited && (
+											{visitedThisHour && (
 												<span className="rounded bg-green-500/80 px-2 py-0.5 text-[0.65rem] font-semibold uppercase text-white tracking-wider flex items-center gap-1">
 													<svg
 														xmlns="http://www.w3.org/2000/svg"
@@ -393,16 +411,15 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 													Visited
 												</span>
 											)}
-											<div className="text-neutral-500 text-xs font-normal">
-												{entry.foundDate && <div>Found at {renderFound(entry)}</div>}
-											</div>
 										</div>
 										<a
 											href={getLive(entry)}
 											type="button"
 											target="_blank"
 											rel="noopener noreferrer"
-											onClick={() => handlePumpkinClick(entry.key)}
+											onClick={() => {
+												handlePumpkinClick(entry.key, entry.foundDate);
+											}}
 											className="mt-1 inline-flex items-center gap-2 rounded bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-100 shadow hover:bg-neutral-800 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
 										>
 											Open live
