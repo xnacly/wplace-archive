@@ -98,6 +98,9 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 
 	const processResponse = useCallback(
 		(raw: PumpkinResponse) => {
+			const lastFullHour = new Date();
+			lastFullHour.setMinutes(0, 0, 0);
+
 			let entries: PumpkinEntry[] = Object.entries(raw)
 				.map(([key, value]) => {
 					return {
@@ -113,10 +116,7 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 						foundRaw: value.foundAt as string,
 					};
 				})
-				.filter((x) => x.foundRaw);
-
-			const lastFullHour = new Date();
-			lastFullHour.setMinutes(0, 0, 0);
+				.filter((x) => x.foundRaw && x.foundDate.getTime() >= lastFullHour.getTime());
 
 			entries = entries.sort((a, b) => {
 				const aKey = Number(a.key);
