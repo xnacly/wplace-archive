@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#define HAVE_SSE2 1
+#else
+#define HAVE_SSE2 0
+#endif
+
 void pumpkin_destroy(pumpkin_t *p) {
   if (!p)
     return;
@@ -106,7 +113,9 @@ bool pumpkin_find(const pumpkin_t *p, const uint8_t *search,
   // this treats rgba as a single 32bit integer
   uint32_t first_pixel_val = *(uint32_t *)first_pixel.rgba;
 
+#pragma GCC ivdep
   for (uint32_t sy = 0; sy <= max_y; sy++) {
+#pragma GCC ivdep
     for (uint32_t sx = 0; sx <= max_x; sx++) {
 
       // apply prefilter from before here
@@ -121,6 +130,7 @@ bool pumpkin_find(const pumpkin_t *p, const uint8_t *search,
       }
 
       bool matched = true;
+
       for (size_t i = 1; i < p->pixel_count; i++) {
         const sample_pixel_t *s = &p->pixels[i];
         size_t idx = ((size_t)sy + s->dy) * search_width + ((size_t)sx + s->dx);
