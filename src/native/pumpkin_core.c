@@ -1,5 +1,4 @@
 #include "pumpkin_core.h"
-#include "stb_image.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,7 +6,6 @@ void pumpkin_destroy(pumpkin_t *p) {
   if (!p)
     return;
   free(p->pixels);
-  memset(p, 0, sizeof(*p));
 }
 
 bool pumpkin_init(pumpkin_t *p, const uint8_t *rgba, uint32_t width,
@@ -16,9 +14,17 @@ bool pumpkin_init(pumpkin_t *p, const uint8_t *rgba, uint32_t width,
     return false;
   }
 
-  if (p->pixels) {
-    pumpkin_destroy(p);
+  if (width == 0 || height == 0) {
+    return false;
   }
+
+  // check for overflows
+  uint64_t total = (uint64_t)width * (uint64_t)height * (uint64_t)channels;
+  if (total > SIZE_MAX) {
+    return false;
+  }
+
+  pumpkin_destroy(p);
 
   size_t count = 0;
   uint16_t first_dx = 0, first_dy = 0;
@@ -83,22 +89,47 @@ bool pumpkin_find(const pumpkin_t *p, const uint8_t *search,
   if (search_width < p->width || search_height < p->height) {
     return false;
   }
+  if (p->pixel_count == 0) {
+    return false;
+  }
+
+  // 1. skip bad candidates before doing full scan.
+  // 2. merging rgba[4] into uint32_t results in very fast comparisons
+  // 3. early return: skip rest on first mismatch
+  // 4. do less work per loop
 
   uint32_t max_x = search_width - p->width;
   uint32_t max_y = search_height - p->height;
 
+  // prefiltering here
+  const sample_pixel_t first_pixel = p->pixels[0];
+  // this treats rgba as a single 32bit integer
+  uint32_t first_pixel_val = *(uint32_t *)first_pixel.rgba;
+
   for (uint32_t sy = 0; sy <= max_y; sy++) {
     for (uint32_t sx = 0; sx <= max_x; sx++) {
-      bool matched = true;
 
-      for (size_t i = 0; i < p->pixel_count; i++) {
+      // apply prefilter from before here
+      size_t idx0 = ((size_t)sy + first_pixel.dy) * search_width +
+                    ((size_t)sx + first_pixel.dx);
+      idx0 *= channels;
+      uint32_t cand_val = *(uint32_t *)&search[idx0];
+
+      // reject filtered out candidates
+      if (cand_val != first_pixel_val) {
+        continue;
+      }
+
+      bool matched = true;
+      for (size_t i = 1; i < p->pixel_count; i++) {
         const sample_pixel_t *s = &p->pixels[i];
-        size_t idx =
-            (((size_t)sy + s->dy) * search_width + ((size_t)sx + s->dx)) *
-            channels;
-        const uint8_t *cand = &search[idx];
-        if (cand[0] != s->rgba[0] || cand[1] != s->rgba[1] ||
-            cand[2] != s->rgba[2] || cand[3] != s->rgba[3]) {
+        size_t idx = ((size_t)sy + s->dy) * search_width + ((size_t)sx + s->dx);
+        idx *= channels;
+
+        // again treat rgba[4] as a single 32bit integer, its faster
+        uint32_t search_val = *(uint32_t *)&search[idx];
+        uint32_t pumpkin_val = *(uint32_t *)s->rgba;
+        if (search_val != pumpkin_val) {
           matched = false;
           break;
         }
