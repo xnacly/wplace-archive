@@ -12,6 +12,7 @@ import { BankTransfer } from "./BankTransfer";
 import { Donate } from "./Donate";
 import { About } from "./About";
 import { Crypto } from "./Crypto";
+import { PumpkinsModal } from "./PumpkinsModal";
 // @ts-ignore
 import { useEvent } from "./use-event.js";
 
@@ -114,6 +115,29 @@ function buildHash(params: Record<string, any>) {
 	return location.pathname + "#" + parts.join("&");
 }
 
+function updateHashParams(updates: Record<string, any>) {
+	if (typeof window === "undefined") return;
+	const params = parseHash();
+
+	for (const [key, value] of Object.entries(updates)) {
+		if (value === undefined || value === null || value === false || value === "") {
+			delete params[key];
+		} else {
+			params[key] = String(value);
+		}
+	}
+
+	if (Object.keys(params).length === 0) {
+		if (window.location.hash) {
+			window.history.replaceState(null, "", window.location.pathname + window.location.search);
+		}
+		return;
+	}
+
+	const newHash = buildHash(params);
+	if (window.location.hash !== newHash) window.history.replaceState(null, "", newHash);
+}
+
 function App() {
 	const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
 	const isDarkTheme = theme === "dark";
@@ -125,6 +149,11 @@ function App() {
 	const [isDonateOpen, setIsDonateOpen] = useState(false);
 	const [isCryptoOpen, setIsCryptoOpen] = useState(false);
 	const [isBankTransferOpen, setIsBankTransferOpen] = useState(false);
+	const [isPumpkinsOpen, setIsPumpkinsOpen] = useState(() => {
+		if (typeof window === "undefined") return false;
+		const params = parseHash();
+		return params.pumpkins === "1" || params.pumpkins === "true";
+	});
 	let [times, setTimes] = useState<Date[]>(defaultTimes);
 
 	const [isTakingScreenshot, setIsTakingScreenshot] = useState(false);
@@ -316,7 +345,12 @@ function App() {
 		});
 
 		// React to manual hash edits
-		const onHashChange = () => applyParamsToMap(parseHash());
+		const onHashChange = () => {
+			const params = parseHash();
+			applyParamsToMap(params);
+			const shouldOpenPumpkins = params.pumpkins === "1" || params.pumpkins === "true";
+			setIsPumpkinsOpen(shouldOpenPumpkins);
+		};
 		window.addEventListener("hashchange", onHashChange);
 
 		return () => {
@@ -437,8 +471,13 @@ function App() {
 			const z = map.getZoom();
 			const currentTimeLocal = times[index];
 			const slug = timeSlug(currentTimeLocal);
-			const newHash = buildHash({ z: z.toFixed(2), lat: c.lat.toFixed(5), lng: c.lng.toFixed(5), time: slug });
-			if (window.location.hash !== newHash) window.history.replaceState(null, "", newHash);
+			updateHashParams({
+				z: z.toFixed(2),
+				lat: c.lat.toFixed(5),
+				lng: c.lng.toFixed(5),
+				time: slug,
+				pumpkins: isPumpkinsOpen ? "1" : undefined,
+			});
 			setSelectionChanged(false);
 
 			if (selChanged) return;
@@ -601,6 +640,14 @@ function App() {
 		setIsCryptoOpen(true);
 	}, []);
 	const closeCrypto = useCallback(() => setIsCryptoOpen(false), []);
+	const openPumpkins = useCallback(() => {
+		setIsPumpkinsOpen(true);
+	}, []);
+	const closePumpkins = useCallback(() => setIsPumpkinsOpen(false), []);
+
+	useEffect(() => {
+		updateHashParams({ pumpkins: isPumpkinsOpen ? "1" : undefined });
+	}, [isPumpkinsOpen]);
 
 	useEffect(() => {
 		if (!isAboutOpen) return;
@@ -657,6 +704,22 @@ function App() {
 						/>
 					</svg>
 					About
+				</button>
+				<button
+					type="button"
+					onClick={openPumpkins}
+					className="rounded bg-neutral-900/70 px-3 py-1 shadow-md backdrop-blur font-semibold flex flex-row items-center gap-2 cursor-pointer hover:bg-neutral-800/70 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-neutral-200"
+					aria-haspopup="dialog"
+					aria-expanded={isPumpkinsOpen}
+					aria-controls="pumpkins-modal"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="size-3" aria-hidden="true">
+						<path
+							fill="currentColor"
+							d="M365.78 29.16C310.83-8.04 240.34-9.1 184.37 27.89c-91.28 61.06-135.17 147.51-156.12 214.4C6.29 291.59-.97 349.8.05 405.45c.56 30.42 25.8 55.45 56.25 55.45h231.01c76.95 0 115.43-34.09 156.32-78.3 31.98-34.44 56.76-92.54 56.76-140.78 0-122.95-48.69-188.17-134.61-212.65zM224 344c0-17.67 14.33-32 32-32 17.67 0 32 14.33 32 32v8h8c17.67 0 32 14.33 32 32 0 17.67-14.33 32-32 32h-8v8c0 17.67-14.33 32-32 32-17.67 0-32-14.33-32-32v-8h-8c-17.67 0-32-14.33-32-32 0-17.67 14.33-32 32-32h8z"
+						/>
+					</svg>
+					Pumpkins
 				</button>
 				<div className="pointer-events-none rounded bg-neutral-900/70 px-3 py-1 shadow-md backdrop-blur">
 					<span className="text-neutral-400 mr-1">Current:</span>
@@ -780,6 +843,7 @@ function App() {
 			{isBankTransferOpen && <BankTransfer closeBankTransfer={closeBankTransfer} />}
 			{isDonateOpen && <Donate openBankTransfer={openBankTransfer} closeDonate={closeDonate} openCrypto={openCrypto} />}
 			{isCryptoOpen && <Crypto closeCrypto={closeCrypto} />}
+			{isPumpkinsOpen && <PumpkinsModal onClose={closePumpkins} />}
 		</>
 	);
 }
