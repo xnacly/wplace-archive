@@ -207,10 +207,8 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 			console.error("Failed to fetch pumpkins:", err);
 			setError((err as Error).message || "Unknown error");
 		} finally {
-			if (mountedRef.current) {
-				setLoading(false);
-			}
 		}
+		setLoading(false);
 	}, [processResponse]);
 
 	useEffect(() => {
