@@ -42,3 +42,5 @@ vips-properties.xml
 
 **/*.tar.gz
 *.txt
+
+build/
