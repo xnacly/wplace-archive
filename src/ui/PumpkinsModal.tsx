@@ -31,7 +31,7 @@ type PumpkinEntry = {
 	offsetX: number;
 	offsetY: number;
 	event?: boolean;
-	foundDate: Date | null;
+	foundDate: Date;
 	foundRaw?: string;
 };
 
@@ -98,7 +98,7 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 
 	const processResponse = useCallback(
 		(raw: PumpkinResponse) => {
-			const entries: PumpkinEntry[] = Object.entries(raw)
+			let entries: PumpkinEntry[] = Object.entries(raw)
 				.map(([key, value]) => {
 					return {
 						key,
@@ -109,31 +109,25 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 						offsetX: value.offsetX,
 						offsetY: value.offsetY,
 						event: value.event,
-						foundDate: value.foundAt ? new Date(value.foundAt as string) : null,
+						foundDate: new Date(value.foundAt as string),
 						foundRaw: value.foundAt as string,
 					};
 				})
-				.filter((x) => x.foundDate);
+				.filter((x) => x.foundRaw);
 
 			const lastFullHour = new Date();
 			lastFullHour.setMinutes(0, 0, 0);
 
-			entries.sort((a, b) => {
+			entries = entries.sort((a, b) => {
 				const aKey = Number(a.key);
 				const bKey = Number(b.key);
 
-				if (a.foundDate && b.foundDate) {
-					if (a.foundDate.getTime() >= lastFullHour.getTime() && b.foundDate.getTime() >= lastFullHour.getTime()) {
-						// found this hour
-						// => sort by key
-						return aKey - bKey;
-					}
+				const fullHourA = a.foundDate.getHours();
+				const fullHourB = b.foundDate.getHours();
 
-					return a.foundDate.getTime() - b.foundDate.getTime();
+				if (fullHourA !== fullHourB) {
+					return fullHourB - fullHourA;
 				}
-
-				// if (a.foundDate) return -1;
-				// if (b.foundDate) return 1;
 
 				return aKey - bKey;
 			});
