@@ -281,7 +281,7 @@ export function PumpkinsModal({ onClose }: { onClose: () => void }) {
 				id="pumpkins-modal"
 				aria-modal="true"
 				aria-labelledby="pumpkins-modal-title"
-				className="bg-white/95 text-neutral-900 max-w-xl w-[92%] rounded-lg shadow-xl p-6 space-y-4 h-full max-h-[100vh] overflow-hidden overflow-y-auto"
+				className="bg-white/95 text-neutral-900 max-w-xl w-[92%] rounded-lg shadow-xl p-6 space-y-4 max-h-[100vh] overflow-hidden overflow-y-auto"
 				onClick={(event) => event.stopPropagation()}
 			>
 				<div className="flex items-start justify-between gap-4">
