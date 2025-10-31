@@ -1,8 +1,9 @@
 #include "pumpkin_core.h"
+#include "stb_image.h"
 #include <stdlib.h>
 #include <string.h>
 
-void pumpkin_clear(pumpkin_t *p) {
+void pumpkin_destroy(pumpkin_t *p) {
   if (!p)
     return;
   free(p->pixels);
@@ -15,7 +16,9 @@ bool pumpkin_init(pumpkin_t *p, const uint8_t *rgba, uint32_t width,
     return false;
   }
 
-  pumpkin_clear(p);
+  if (p->pixels) {
+    pumpkin_destroy(p);
+  }
 
   size_t count = 0;
   uint16_t first_dx = 0, first_dy = 0;
