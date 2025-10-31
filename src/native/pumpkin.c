@@ -48,10 +48,7 @@ static napi_value js_set_pumpkin(napi_env env, napi_callback_info info) {
     return NULL;
   }
 
-  napi_value result;
-  NAPI_CALL(env,
-            napi_create_uint32(env, (uint32_t)g_pumpkin.pixel_count, &result));
-  return result;
+  return NULL;
 }
 
 static napi_value js_find_pumpkin(napi_env env, napi_callback_info info) {
@@ -59,7 +56,7 @@ static napi_value js_find_pumpkin(napi_env env, napi_callback_info info) {
   napi_value argv[4];
   NAPI_CALL(env, napi_get_cb_info(env, info, &argc, argv, NULL, NULL));
 
-  if (!g_pumpkin.rgba) {
+  if (!g_pumpkin.rows) {
     napi_throw_error(env, NULL, "Pumpkin not initialized");
     return NULL;
   }

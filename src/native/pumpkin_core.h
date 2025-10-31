@@ -5,19 +5,15 @@
 #include <stdint.h>
 
 typedef struct {
-  uint16_t dx;
-  uint16_t dy;
-  uint8_t rgba[4];
-} sample_pixel_t;
+  uint32_t *rgba; // contiguous pixels in this row
+  uint16_t *dx;   // x offsets for each pixel in this row
+  size_t count;   // number of pixels in this row
+} pumpkin_row_t;
 
 typedef struct {
-  uint16_t *dx;   // array of x offsets
-  uint16_t *dy;   // array of y offsets
-  uint32_t *rgba; // array of packed RGBA pixels as uint32_t
-  size_t pixel_count;
-  uint32_t width;
-  uint32_t height;
-  uint32_t channels;
+  pumpkin_row_t *rows; // array of rows (size = pumpkin_height)
+  size_t height;       // total rows
+  uint16_t width;      // pumpkin width
   uint16_t first_pixel_dx;
   uint16_t first_pixel_dy;
 } pumpkin_t;
