@@ -4,11 +4,11 @@ WORKDIR /app
 
 COPY package*.json bun.lock* ./
 
-RUN bun install
+RUN bun install --ignore-scripts
 
 COPY . .
 
-RUN bun run build --ignore-scripts
+RUN bun run build 
 
 EXPOSE 4173
 
